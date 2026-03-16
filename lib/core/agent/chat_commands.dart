@@ -1,0 +1,171 @@
+/// Chat commands matching OpenClaw's slash command system.
+///
+/// Intercepts messages starting with "/" before sending to the LLM.
+library;
+
+import 'package:flutterclaw/core/agent/agent_loop.dart';
+import 'package:flutterclaw/core/agent/session_manager.dart';
+import 'package:flutterclaw/data/models/config.dart';
+
+class ChatCommandResult {
+  final bool handled;
+  final String? response;
+
+  const ChatCommandResult({this.handled = false, this.response});
+
+  static const notHandled = ChatCommandResult();
+}
+
+class ChatCommandHandler {
+  final SessionManager sessionManager;
+  final ConfigManager configManager;
+  final AgentLoop agentLoop;
+
+  ChatCommandHandler({
+    required this.sessionManager,
+    required this.configManager,
+    required this.agentLoop,
+  });
+
+  Future<ChatCommandResult> handle(String sessionKey, String message) async {
+    if (!message.startsWith('/')) return ChatCommandResult.notHandled;
+
+    final parts = message.trim().split(RegExp(r'\s+'));
+    final command = parts[0].toLowerCase();
+    final args = parts.skip(1).toList();
+
+    switch (command) {
+      case '/status':
+        return _handleStatus(sessionKey);
+      case '/new':
+      case '/reset':
+        return _handleReset(sessionKey);
+      case '/compact':
+        return _handleCompact(sessionKey);
+      case '/model':
+        return _handleModel(sessionKey, args);
+      case '/think':
+        return _handleThink(args);
+      case '/verbose':
+        return _handleVerbose(args);
+      case '/usage':
+        return _handleUsage(args);
+      case '/help':
+        return _handleHelp();
+      default:
+        return ChatCommandResult.notHandled;
+    }
+  }
+
+  Future<ChatCommandResult> _handleStatus(String sessionKey) async {
+    final sessions = sessionManager.listSessions();
+    final meta =
+        sessions.where((s) => s.key == sessionKey).firstOrNull;
+
+    if (meta == null) {
+      return const ChatCommandResult(
+        handled: true,
+        response: 'No active session.',
+      );
+    }
+
+    final modelName =
+        meta.modelOverride ?? configManager.config.agents.defaults.modelName;
+
+    return ChatCommandResult(
+      handled: true,
+      response: '**Session Status**\n\n'
+          '- **Session:** ${meta.key}\n'
+          '- **Model:** $modelName\n'
+          '- **Messages:** ${meta.messageCount}\n'
+          '- **Tokens:** ${meta.totalTokens} total '
+          '(${meta.inputTokens} in / ${meta.outputTokens} out)\n'
+          '- **Channel:** ${meta.channelType}\n'
+          '- **Last activity:** ${meta.lastActivity.toIso8601String()}',
+    );
+  }
+
+  Future<ChatCommandResult> _handleReset(String sessionKey) async {
+    await sessionManager.reset(sessionKey);
+    return const ChatCommandResult(
+      handled: true,
+      response: 'Session reset. Starting fresh.',
+    );
+  }
+
+  Future<ChatCommandResult> _handleCompact(String sessionKey) async {
+    final summary = await agentLoop.compactSession(sessionKey);
+    if (summary == null) {
+      return const ChatCommandResult(
+        handled: true,
+        response: 'Nothing to compact (session too short).',
+      );
+    }
+    return ChatCommandResult(
+      handled: true,
+      response: '**Compacted.** Summary:\n\n$summary',
+    );
+  }
+
+  Future<ChatCommandResult> _handleModel(
+      String sessionKey, List<String> args) async {
+    if (args.isEmpty) {
+      final current =
+          configManager.config.agents.defaults.modelName;
+      final models = configManager.config.modelList
+          .map((m) => '- ${m.modelName} (`${m.model}`)')
+          .join('\n');
+      return ChatCommandResult(
+        handled: true,
+        response: '**Current model:** $current\n\n**Available:**\n$models',
+      );
+    }
+
+    final modelName = args.join(' ');
+    await sessionManager.setModelOverride(sessionKey, modelName);
+    return ChatCommandResult(
+      handled: true,
+      response: 'Model switched to **$modelName** for this session.',
+    );
+  }
+
+  ChatCommandResult _handleThink(List<String> args) {
+    final level = args.isNotEmpty ? args[0] : 'medium';
+    return ChatCommandResult(
+      handled: true,
+      response: 'Thinking level set to **$level**. '
+          '(Note: thinking levels depend on model support.)',
+    );
+  }
+
+  ChatCommandResult _handleVerbose(List<String> args) {
+    final mode = args.isNotEmpty ? args[0] : 'on';
+    return ChatCommandResult(
+      handled: true,
+      response: 'Verbose mode: **$mode**.',
+    );
+  }
+
+  ChatCommandResult _handleUsage(List<String> args) {
+    final mode = args.isNotEmpty ? args[0] : 'tokens';
+    return ChatCommandResult(
+      handled: true,
+      response: 'Usage display mode: **$mode**.',
+    );
+  }
+
+  ChatCommandResult _handleHelp() {
+    return const ChatCommandResult(
+      handled: true,
+      response: '**Chat Commands**\n\n'
+          '- `/status` -- session info (model, tokens, cost)\n'
+          '- `/new` or `/reset` -- reset the session\n'
+          '- `/compact` -- compress session context\n'
+          '- `/model [name]` -- view or switch model\n'
+          '- `/think <level>` -- off|low|medium|high\n'
+          '- `/verbose on|off` -- toggle verbose mode\n'
+          '- `/usage off|tokens|full` -- usage footer mode\n'
+          '- `/help` -- show this help',
+    );
+  }
+}

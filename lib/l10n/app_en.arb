@@ -1,0 +1,1809 @@
+{
+  "appTitle": "FlutterClaw",
+  "@appTitle": {
+    "description": "Application title"
+  },
+
+  "chat": "Chat",
+  "@chat": {
+    "description": "Chat tab label"
+  },
+
+  "channels": "Channels",
+  "@channels": {
+    "description": "Channels tab label"
+  },
+
+  "agent": "Agent",
+  "@agent": {
+    "description": "Agent tab label"
+  },
+
+  "settings": "Settings",
+  "@settings": {
+    "description": "Settings tab label"
+  },
+
+  "getStarted": "Get Started",
+  "@getStarted": {
+    "description": "Welcome page button"
+  },
+
+  "yourPersonalAssistant": "Your personal AI assistant",
+  "@yourPersonalAssistant": {
+    "description": "App tagline"
+  },
+
+  "multiChannelChat": "Multi-channel chat",
+  "@multiChannelChat": {
+    "description": "Feature description"
+  },
+
+  "multiChannelChatDesc": "Telegram, Discord, Chat and more",
+  "@multiChannelChatDesc": {
+    "description": "Multi-channel chat description"
+  },
+
+  "powerfulAIModels": "Powerful AI models",
+  "@powerfulAIModels": {
+    "description": "Feature description"
+  },
+
+  "powerfulAIModelsDesc": "OpenAI, Anthropic, Grok, and free models",
+  "@powerfulAIModelsDesc": {
+    "description": "AI models description"
+  },
+
+  "localGateway": "Local gateway",
+  "@localGateway": {
+    "description": "Feature description"
+  },
+
+  "localGatewayDesc": "Runs on your device, your data stays yours",
+  "@localGatewayDesc": {
+    "description": "Local gateway description"
+  },
+
+  "chooseProvider": "Choose a Provider",
+  "@chooseProvider": {
+    "description": "Provider selection page title"
+  },
+
+  "selectProviderDesc": "Select how you want to connect to AI models.",
+  "@selectProviderDesc": {
+    "description": "Provider selection description"
+  },
+
+  "startForFree": "Start for Free",
+  "@startForFree": {
+    "description": "Free providers section title"
+  },
+
+  "freeProvidersDesc": "These providers offer free models to get you started with no cost.",
+  "@freeProvidersDesc": {
+    "description": "Free providers description"
+  },
+
+  "free": "FREE",
+  "@free": {
+    "description": "Free badge label"
+  },
+
+  "otherProviders": "Other Providers",
+  "@otherProviders": {
+    "description": "Paid providers section title"
+  },
+
+  "connectToProvider": "Connect to {provider}",
+  "@connectToProvider": {
+    "description": "Auth page title",
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      }
+    }
+  },
+
+  "enterApiKeyDesc": "Enter your API key and select a model.",
+  "@enterApiKeyDesc": {
+    "description": "Auth page description"
+  },
+
+  "dontHaveApiKey": "Don't have an API key?",
+  "@dontHaveApiKey": {
+    "description": "API key prompt"
+  },
+
+  "createAccountCopyKey": "Create an account and copy your key.",
+  "@createAccountCopyKey": {
+    "description": "API key instructions"
+  },
+
+  "signUp": "Sign up",
+  "@signUp": {
+    "description": "Sign up button"
+  },
+
+  "apiKey": "API Key",
+  "@apiKey": {
+    "description": "API key field label"
+  },
+
+  "pasteFromClipboard": "Paste from clipboard",
+  "@pasteFromClipboard": {
+    "description": "Paste button tooltip"
+  },
+
+  "apiBaseUrl": "API Base URL",
+  "@apiBaseUrl": {
+    "description": "API base URL field label"
+  },
+
+  "selectModel": "Select Model",
+  "@selectModel": {
+    "description": "Model selection label"
+  },
+
+  "modelId": "Model ID",
+  "@modelId": {
+    "description": "Model ID field label"
+  },
+
+  "validateKey": "Validate Key",
+  "@validateKey": {
+    "description": "Validate button label"
+  },
+
+  "validating": "Validating...",
+  "@validating": {
+    "description": "Validating status"
+  },
+
+  "invalidApiKey": "Invalid API key",
+  "@invalidApiKey": {
+    "description": "Invalid key error"
+  },
+
+  "gatewayConfiguration": "Gateway Configuration",
+  "@gatewayConfiguration": {
+    "description": "Gateway page title"
+  },
+
+  "gatewayConfigDesc": "The gateway is the local control plane for your assistant.",
+  "@gatewayConfigDesc": {
+    "description": "Gateway configuration description"
+  },
+
+  "defaultSettingsNote": "The default settings work for most users. Only change these if you know what you need.",
+  "@defaultSettingsNote": {
+    "description": "Gateway settings note"
+  },
+
+  "host": "Host",
+  "@host": {
+    "description": "Host field label"
+  },
+
+  "port": "Port",
+  "@port": {
+    "description": "Port field label"
+  },
+
+  "autoStartGateway": "Auto-start gateway",
+  "@autoStartGateway": {
+    "description": "Auto-start toggle label"
+  },
+
+  "autoStartGatewayDesc": "Start the gateway automatically when the app launches.",
+  "@autoStartGatewayDesc": {
+    "description": "Auto-start description"
+  },
+
+  "channelsPageTitle": "Channels",
+  "@channelsPageTitle": {
+    "description": "Channels page title"
+  },
+
+  "channelsPageDesc": "Optionally connect messaging channels. You can always set these up later in Settings.",
+  "@channelsPageDesc": {
+    "description": "Channels page description"
+  },
+
+  "telegram": "Telegram",
+  "@telegram": {
+    "description": "Telegram channel name"
+  },
+
+  "connectTelegramBot": "Connect a Telegram bot.",
+  "@connectTelegramBot": {
+    "description": "Telegram description"
+  },
+
+  "openBotFather": "Open BotFather",
+  "@openBotFather": {
+    "description": "BotFather link label"
+  },
+
+  "discord": "Discord",
+  "@discord": {
+    "description": "Discord channel name"
+  },
+
+  "connectDiscordBot": "Connect a Discord bot.",
+  "@connectDiscordBot": {
+    "description": "Discord description"
+  },
+
+  "developerPortal": "Developer Portal",
+  "@developerPortal": {
+    "description": "Discord developer portal link"
+  },
+
+  "botToken": "Bot Token",
+  "@botToken": {
+    "description": "Bot token field label"
+  },
+
+  "telegramBotToken": "{platform} Bot Token",
+  "@telegramBotToken": {
+    "description": "Platform-specific bot token",
+    "placeholders": {
+      "platform": {
+        "type": "String"
+      }
+    }
+  },
+
+  "readyToGo": "Ready to Go",
+  "@readyToGo": {
+    "description": "Completion page title"
+  },
+
+  "reviewConfiguration": "Review your configuration and start FlutterClaw.",
+  "@reviewConfiguration": {
+    "description": "Completion page description"
+  },
+
+  "model": "Model",
+  "@model": {
+    "description": "Model section label"
+  },
+
+  "viaProvider": "via {provider}",
+  "@viaProvider": {
+    "description": "Provider attribution",
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      }
+    }
+  },
+
+  "gateway": "Gateway",
+  "@gateway": {
+    "description": "Gateway section label"
+  },
+
+  "webChatOnly": "Chat only (you can add more later)",
+  "@webChatOnly": {
+    "description": "Default channels message"
+  },
+
+  "webChat": "Chat",
+  "@webChat": {
+    "description": "In-app chat channel name"
+  },
+
+  "starting": "Starting...",
+  "@starting": {
+    "description": "Starting status"
+  },
+
+  "startFlutterClaw": "Start FlutterClaw",
+  "@startFlutterClaw": {
+    "description": "Start button label"
+  },
+
+  "newSession": "New session",
+  "@newSession": {
+    "description": "New session tooltip"
+  },
+
+  "photoLibrary": "Photo Library",
+  "@photoLibrary": {
+    "description": "Photo library option"
+  },
+
+  "camera": "Camera",
+  "@camera": {
+    "description": "Camera option"
+  },
+
+  "whatDoYouSeeInImage": "What do you see in this image?",
+  "@whatDoYouSeeInImage": {
+    "description": "Default image caption"
+  },
+
+  "imagePickerNotAvailable": "Image picker not available on Simulator. Use a real device.",
+  "@imagePickerNotAvailable": {
+    "description": "Simulator error"
+  },
+
+  "couldNotOpenImagePicker": "Could not open image picker.",
+  "@couldNotOpenImagePicker": {
+    "description": "Image picker error"
+  },
+
+  "copiedToClipboard": "Copied to clipboard",
+  "@copiedToClipboard": {
+    "description": "Copy confirmation"
+  },
+
+  "attachImage": "Attach image",
+  "@attachImage": {
+    "description": "Attach button tooltip"
+  },
+
+  "messageFlutterClaw": "Message FlutterClaw...",
+  "@messageFlutterClaw": {
+    "description": "Chat input placeholder"
+  },
+
+  "channelsAndGateway": "Channels & Gateway",
+  "@channelsAndGateway": {
+    "description": "Channels screen title"
+  },
+
+  "stop": "Stop",
+  "@stop": {
+    "description": "Stop button"
+  },
+
+  "start": "Start",
+  "@start": {
+    "description": "Start button"
+  },
+
+  "status": "Status: {status}",
+  "@status": {
+    "description": "Status label",
+    "placeholders": {
+      "status": {
+        "type": "String"
+      }
+    }
+  },
+
+  "builtInChatInterface": "Built-in chat interface",
+  "@builtInChatInterface": {
+    "description": "WebChat description"
+  },
+
+  "notConfigured": "Not configured",
+  "@notConfigured": {
+    "description": "Channel status"
+  },
+
+  "connected": "Connected",
+  "@connected": {
+    "description": "Channel status"
+  },
+
+  "configuredStarting": "Configured (starting...)",
+  "@configuredStarting": {
+    "description": "Channel status"
+  },
+
+  "telegramConfiguration": "Telegram Configuration",
+  "@telegramConfiguration": {
+    "description": "Telegram config dialog title"
+  },
+
+  "fromBotFather": "From @BotFather",
+  "@fromBotFather": {
+    "description": "Telegram token hint"
+  },
+
+  "allowedUserIds": "Allowed User IDs (comma separated)",
+  "@allowedUserIds": {
+    "description": "Allowed users field label"
+  },
+
+  "leaveEmptyToAllowAll": "Leave empty to allow all",
+  "@leaveEmptyToAllowAll": {
+    "description": "Allow all users hint"
+  },
+
+  "cancel": "Cancel",
+  "@cancel": {
+    "description": "Cancel button"
+  },
+
+  "saveAndConnect": "Save & Connect",
+  "@saveAndConnect": {
+    "description": "Save and connect button"
+  },
+
+  "discordConfiguration": "Discord Configuration",
+  "@discordConfiguration": {
+    "description": "Discord config dialog title"
+  },
+
+  "pendingPairingRequests": "Pending Pairing Requests",
+  "@pendingPairingRequests": {
+    "description": "Pairing section title"
+  },
+
+  "approve": "Approve",
+  "@approve": {
+    "description": "Approve button tooltip"
+  },
+
+  "reject": "Reject",
+  "@reject": {
+    "description": "Reject button tooltip"
+  },
+
+  "expired": "Expired",
+  "@expired": {
+    "description": "Expired status"
+  },
+
+  "minutesLeft": "{minutes}m left",
+  "@minutesLeft": {
+    "description": "Time remaining",
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+
+  "workspaceFiles": "Workspace Files",
+  "@workspaceFiles": {
+    "description": "Workspace section title"
+  },
+
+  "personalAIAssistant": "Personal AI Assistant",
+  "@personalAIAssistant": {
+    "description": "Agent subtitle"
+  },
+
+  "sessionsCount": "Sessions ({count})",
+  "@sessionsCount": {
+    "description": "Sessions section title",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "noActiveSessions": "No active sessions",
+  "@noActiveSessions": {
+    "description": "Empty sessions message"
+  },
+
+  "startConversationToCreate": "Start a conversation to create one",
+  "@startConversationToCreate": {
+    "description": "Empty sessions hint"
+  },
+
+  "startConversationToSee": "Start a conversation to see sessions here",
+  "@startConversationToSee": {
+    "description": "Empty sessions hint (alternative)"
+  },
+
+  "reset": "Reset",
+  "@reset": {
+    "description": "Reset action"
+  },
+
+  "cronJobs": "Cron Jobs",
+  "@cronJobs": {
+    "description": "Cron jobs section title"
+  },
+
+  "noCronJobs": "No cron jobs",
+  "@noCronJobs": {
+    "description": "Empty cron jobs message"
+  },
+
+  "addScheduledTasks": "Add scheduled tasks for your agent",
+  "@addScheduledTasks": {
+    "description": "Cron jobs hint"
+  },
+
+  "runNow": "Run Now",
+  "@runNow": {
+    "description": "Run job action"
+  },
+
+  "enable": "Enable",
+  "@enable": {
+    "description": "Enable action"
+  },
+
+  "disable": "Disable",
+  "@disable": {
+    "description": "Disable action"
+  },
+
+  "delete": "Delete",
+  "@delete": {
+    "description": "Delete action"
+  },
+
+  "skills": "Skills",
+  "@skills": {
+    "description": "Skills section title"
+  },
+
+  "browseClawHub": "Browse ClawHub",
+  "@browseClawHub": {
+    "description": "ClawHub button tooltip"
+  },
+
+  "noSkillsInstalled": "No skills installed",
+  "@noSkillsInstalled": {
+    "description": "Empty skills message"
+  },
+
+  "browseClawHubToAdd": "Browse ClawHub to add skills",
+  "@browseClawHubToAdd": {
+    "description": "Skills hint"
+  },
+
+  "removeSkillConfirm": "Remove \"{name}\" from your skills?",
+  "@removeSkillConfirm": {
+    "description": "Remove skill confirmation",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+
+  "clawHubSkills": "ClawHub Skills",
+  "@clawHubSkills": {
+    "description": "ClawHub browser title"
+  },
+
+  "searchSkills": "Search skills...",
+  "@searchSkills": {
+    "description": "Search field hint"
+  },
+
+  "noSkillsFound": "No skills found. Try a different search.",
+  "@noSkillsFound": {
+    "description": "No results message"
+  },
+
+  "installedSkill": "Installed {name}",
+  "@installedSkill": {
+    "description": "Install success message",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+
+  "failedToInstallSkill": "Failed to install {name}",
+  "@failedToInstallSkill": {
+    "description": "Install failure message",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+
+  "addCronJob": "Add Cron Job",
+  "@addCronJob": {
+    "description": "Add cron job dialog title"
+  },
+
+  "jobName": "Job Name",
+  "@jobName": {
+    "description": "Job name field label"
+  },
+
+  "dailySummaryExample": "e.g. Daily Summary",
+  "@dailySummaryExample": {
+    "description": "Job name example"
+  },
+
+  "taskPrompt": "Task Prompt",
+  "@taskPrompt": {
+    "description": "Task prompt field label"
+  },
+
+  "whatShouldAgentDo": "What should the agent do?",
+  "@whatShouldAgentDo": {
+    "description": "Task prompt hint"
+  },
+
+  "interval": "Interval",
+  "@interval": {
+    "description": "Interval field label"
+  },
+
+  "every5Minutes": "Every 5 minutes",
+  "@every5Minutes": {
+    "description": "Interval option"
+  },
+
+  "every15Minutes": "Every 15 minutes",
+  "@every15Minutes": {
+    "description": "Interval option"
+  },
+
+  "every30Minutes": "Every 30 minutes",
+  "@every30Minutes": {
+    "description": "Interval option"
+  },
+
+  "everyHour": "Every hour",
+  "@everyHour": {
+    "description": "Interval option"
+  },
+
+  "every6Hours": "Every 6 hours",
+  "@every6Hours": {
+    "description": "Interval option"
+  },
+
+  "every12Hours": "Every 12 hours",
+  "@every12Hours": {
+    "description": "Interval option"
+  },
+
+  "every24Hours": "Every 24 hours",
+  "@every24Hours": {
+    "description": "Interval option"
+  },
+
+  "add": "Add",
+  "@add": {
+    "description": "Add button"
+  },
+
+  "save": "Save",
+  "@save": {
+    "description": "Save button"
+  },
+
+  "sessions": "Sessions",
+  "@sessions": {
+    "description": "Sessions screen title"
+  },
+
+  "messagesCount": "{count} messages",
+  "@messagesCount": {
+    "description": "Message count",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "tokensCount": "{count} tokens",
+  "@tokensCount": {
+    "description": "Token count",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "compact": "Compact",
+  "@compact": {
+    "description": "Compact action"
+  },
+
+  "models": "Models",
+  "@models": {
+    "description": "Models section title"
+  },
+
+  "noModelsConfigured": "No models configured",
+  "@noModelsConfigured": {
+    "description": "Empty models message"
+  },
+
+  "addModelToStartChatting": "Add a model to start chatting",
+  "@addModelToStartChatting": {
+    "description": "Models hint"
+  },
+
+  "addModel": "Add Model",
+  "@addModel": {
+    "description": "Add model button"
+  },
+
+  "default_": "DEFAULT",
+  "@default_": {
+    "description": "Default badge"
+  },
+
+  "autoStart": "Auto-start",
+  "@autoStart": {
+    "description": "Auto-start label"
+  },
+
+  "startGatewayWhenLaunches": "Start gateway when app launches",
+  "@startGatewayWhenLaunches": {
+    "description": "Auto-start description"
+  },
+
+  "heartbeat": "Heartbeat",
+  "@heartbeat": {
+    "description": "Heartbeat section title"
+  },
+
+  "enabled": "Enabled",
+  "@enabled": {
+    "description": "Enabled toggle"
+  },
+
+  "periodicAgentTasks": "Periodic agent tasks from HEARTBEAT.md",
+  "@periodicAgentTasks": {
+    "description": "Heartbeat description"
+  },
+
+  "intervalMinutes": "{minutes} min",
+  "@intervalMinutes": {
+    "description": "Interval display",
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+
+  "about": "About",
+  "@about": {
+    "description": "About section title"
+  },
+
+  "personalAIAssistantForIOS": "Personal AI Assistant for iOS & Android",
+  "@personalAIAssistantForIOS": {
+    "description": "App description"
+  },
+
+  "version": "Version",
+  "@version": {
+    "description": "Version label"
+  },
+
+  "basedOnOpenClaw": "Based on OpenClaw",
+  "@basedOnOpenClaw": {
+    "description": "Attribution"
+  },
+
+  "removeModel": "Remove model?",
+  "@removeModel": {
+    "description": "Remove model dialog title"
+  },
+
+  "removeModelConfirm": "Remove \"{name}\" from your models?",
+  "@removeModelConfirm": {
+    "description": "Remove model confirmation",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+
+  "remove": "Remove",
+  "@remove": {
+    "description": "Remove button"
+  },
+
+  "setAsDefault": "Set as Default",
+  "@setAsDefault": {
+    "description": "Set default button"
+  },
+
+  "paste": "Paste",
+  "@paste": {
+    "description": "Paste tooltip"
+  },
+
+  "chooseProviderStep": "1. Choose Provider",
+  "@chooseProviderStep": {
+    "description": "Step 1 label"
+  },
+
+  "selectModelStep": "2. Select Model",
+  "@selectModelStep": {
+    "description": "Step 2 label"
+  },
+
+  "apiKeyStep": "3. API Key",
+  "@apiKeyStep": {
+    "description": "Step 3 label"
+  },
+
+  "getApiKeyAt": "Get API key at {provider}",
+  "@getApiKeyAt": {
+    "description": "API key link text",
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      }
+    }
+  },
+
+  "justNow": "just now",
+  "@justNow": {
+    "description": "Time ago format"
+  },
+
+  "minutesAgo": "{minutes}m ago",
+  "@minutesAgo": {
+    "description": "Time ago format",
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+
+  "hoursAgo": "{hours}h ago",
+  "@hoursAgo": {
+    "description": "Time ago format",
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+
+  "daysAgo": "{days}d ago",
+  "@daysAgo": {
+    "description": "Time ago format",
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+
+  "microphonePermissionDenied": "Microphone permission denied",
+  "@microphonePermissionDenied": {
+    "description": "Microphone permission error"
+  },
+
+  "liveTranscriptionUnavailable": "Live transcription unavailable: {error}",
+  "@liveTranscriptionUnavailable": {
+    "description": "Transcription unavailable error",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+
+  "failedToStartRecording": "Failed to start recording: {error}",
+  "@failedToStartRecording": {
+    "description": "Recording start error",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+
+  "usingOnDeviceTranscription": "Using on-device transcription",
+  "@usingOnDeviceTranscription": {
+    "description": "Transcription method message"
+  },
+
+  "transcribingWithWhisper": "Transcribing with Whisper API...",
+  "@transcribingWithWhisper": {
+    "description": "Whisper transcription status"
+  },
+
+  "whisperApiFailed": "Whisper API failed: {error}",
+  "@whisperApiFailed": {
+    "description": "Whisper API error",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+
+  "noTranscriptionCaptured": "No transcription captured",
+  "@noTranscriptionCaptured": {
+    "description": "No transcription message"
+  },
+
+  "failedToStopRecording": "Failed to stop recording: {error}",
+  "@failedToStopRecording": {
+    "description": "Recording stop error",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+
+  "failedToPauseResume": "Failed to {action}: {error}",
+  "@failedToPauseResume": {
+    "description": "Pause/resume error",
+    "placeholders": {
+      "action": {
+        "type": "String"
+      },
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+
+  "pause": "Pause",
+  "@pause": {
+    "description": "Pause tooltip"
+  },
+
+  "resume": "Resume",
+  "@resume": {
+    "description": "Resume tooltip"
+  },
+
+  "send": "Send",
+  "@send": {
+    "description": "Send tooltip"
+  },
+
+  "liveActivityActive": "Live Activity active",
+  "@liveActivityActive": {
+    "description": "Live Activity status message"
+  },
+
+  "restartGateway": "Restart Gateway",
+  "@restartGateway": {
+    "description": "Restart gateway tooltip"
+  },
+
+  "modelLabel": "Model: {model}",
+  "@modelLabel": {
+    "description": "Current model display",
+    "placeholders": {
+      "model": {
+        "type": "String"
+      }
+    }
+  },
+
+  "uptimeLabel": "Uptime: {uptime}",
+  "@uptimeLabel": {
+    "description": "Gateway uptime display",
+    "placeholders": {
+      "uptime": {
+        "type": "String"
+      }
+    }
+  },
+
+  "iosBackgroundAudioActive": "iOS: Background audio active - gateway works in background",
+  "@iosBackgroundAudioActive": {
+    "description": "iOS background mode message"
+  },
+
+  "webChatBuiltIn": "Built-in chat interface",
+  "@webChatBuiltIn": {
+    "description": "WebChat description"
+  },
+
+  "configure": "Configure",
+  "@configure": {
+    "description": "Configure button"
+  },
+
+  "disconnect": "Disconnect",
+  "@disconnect": {
+    "description": "Disconnect button"
+  },
+
+  "agents": "Agents",
+  "@agents": {
+    "description": "Agents tab label"
+  },
+
+  "agentFiles": "Agent Files",
+  "@agentFiles": {
+    "description": "Agent files tab label"
+  },
+
+  "createAgent": "Create Agent",
+  "@createAgent": {
+    "description": "Create agent button"
+  },
+
+  "editAgent": "Edit Agent",
+  "@editAgent": {
+    "description": "Edit agent button"
+  },
+
+  "noAgentsYet": "No agents yet",
+  "@noAgentsYet": {
+    "description": "Empty state message"
+  },
+
+  "createYourFirstAgent": "Create your first agent!",
+  "@createYourFirstAgent": {
+    "description": "Empty state call to action"
+  },
+
+  "active": "Active",
+  "@active": {
+    "description": "Active agent status"
+  },
+
+  "agentName": "Agent Name",
+  "@agentName": {
+    "description": "Agent name field label"
+  },
+
+  "emoji": "Emoji",
+  "@emoji": {
+    "description": "Emoji field label"
+  },
+
+  "selectEmoji": "Select Emoji",
+  "@selectEmoji": {
+    "description": "Select emoji button"
+  },
+
+  "vibe": "Vibe",
+  "@vibe": {
+    "description": "Vibe field label"
+  },
+
+  "vibeHint": "e.g., friendly, formal, snarky",
+  "@vibeHint": {
+    "description": "Vibe field hint"
+  },
+
+  "modelConfiguration": "Model Configuration",
+  "@modelConfiguration": {
+    "description": "Model configuration section"
+  },
+
+  "advancedSettings": "Advanced Settings",
+  "@advancedSettings": {
+    "description": "Advanced settings section"
+  },
+
+  "agentCreated": "Agent created",
+  "@agentCreated": {
+    "description": "Success message"
+  },
+
+  "agentUpdated": "Agent updated",
+  "@agentUpdated": {
+    "description": "Success message"
+  },
+
+  "agentDeleted": "Agent deleted",
+  "@agentDeleted": {
+    "description": "Success message"
+  },
+
+  "switchedToAgent": "Switched to {name}",
+  "@switchedToAgent": {
+    "description": "Agent switched message",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+
+  "deleteAgentConfirm": "Delete {name}? This will remove all workspace data.",
+  "@deleteAgentConfirm": {
+    "description": "Delete agent confirmation",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+
+  "setAsDefault": "Set as Default",
+  "@setAsDefault": {
+    "description": "Set as default button"
+  },
+
+  "agentDetails": "Agent Details",
+  "@agentDetails": {
+    "description": "Agent details screen title"
+  },
+
+  "createdAt": "Created",
+  "@createdAt": {
+    "description": "Created date label"
+  },
+
+  "lastUsed": "Last Used",
+  "@lastUsed": {
+    "description": "Last used date label"
+  },
+
+  "basicInformation": "Basic Information",
+  "@basicInformation": {
+    "description": "Basic information section"
+  },
+
+  "switchToAgent": "Switch Agent",
+  "@switchToAgent": {
+    "description": "Switch agent modal title"
+  },
+
+  "providers": "Providers",
+  "@providers": {
+    "description": "Settings section header"
+  },
+
+  "addProvider": "Add provider",
+  "@addProvider": {
+    "description": "Add provider button"
+  },
+
+  "noProvidersConfigured": "No providers configured.",
+  "@noProvidersConfigured": {
+    "description": "Empty providers message"
+  },
+
+  "editCredentials": "Edit credentials",
+  "@editCredentials": {
+    "description": "Edit credentials tooltip"
+  },
+
+  "defaultModelHint": "The default model is used by agents that don't specify their own.",
+  "@defaultModelHint": {
+    "description": "Default model explanation"
+  },
+
+  "holdToSetAsDefault": "Hold to set as default",
+  "@holdToSetAsDefault": {
+    "description": "Tooltip for model long-press"
+  },
+
+  "integrations": "Integrations",
+  "@integrations": {
+    "description": "Settings section header"
+  },
+
+  "shortcutsIntegrations": "Shortcuts Integrations",
+  "@shortcutsIntegrations": {
+    "description": "Shortcuts integration title"
+  },
+
+  "shortcutsIntegrationsDesc": "Install iOS Shortcuts to run third-party app actions",
+  "@shortcutsIntegrationsDesc": {
+    "description": "Shortcuts integration description"
+  },
+
+  "dangerZone": "Danger zone",
+  "@dangerZone": {
+    "description": "Settings section header"
+  },
+
+  "resetOnboarding": "Reset & re-run onboarding",
+  "@resetOnboarding": {
+    "description": "Reset onboarding title"
+  },
+
+  "resetOnboardingDesc": "Deletes all configuration and returns to the setup wizard.",
+  "@resetOnboardingDesc": {
+    "description": "Reset onboarding description"
+  },
+
+  "resetAllConfiguration": "Reset all configuration?",
+  "@resetAllConfiguration": {
+    "description": "Reset confirmation dialog title"
+  },
+
+  "resetAllConfigurationDesc": "This will delete your API keys, models, and all settings. The app will return to the setup wizard.\n\nYour conversation history is not deleted.",
+  "@resetAllConfigurationDesc": {
+    "description": "Reset confirmation dialog body"
+  },
+
+  "removeProvider": "Remove provider",
+  "@removeProvider": {
+    "description": "Remove provider dialog title"
+  },
+
+  "removeProviderConfirm": "Remove credentials for {provider}?",
+  "@removeProviderConfirm": {
+    "description": "Remove provider confirmation",
+    "placeholders": {
+      "provider": {
+        "type": "String"
+      }
+    }
+  },
+
+  "modelSetAsDefault": "{name} set as default model",
+  "@modelSetAsDefault": {
+    "description": "Model set as default confirmation",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+
+  "photoImage": "Photo / Image",
+  "@photoImage": {
+    "description": "Attach menu option"
+  },
+
+  "documentPdfTxt": "Document (PDF / TXT)",
+  "@documentPdfTxt": {
+    "description": "Attach menu option"
+  },
+
+  "couldNotOpenDocument": "Could not open document: {error}",
+  "@couldNotOpenDocument": {
+    "description": "Document open error",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+
+  "retry": "Retry",
+  "@retry": {
+    "description": "Retry button"
+  },
+
+  "gatewayStopped": "Gateway stopped",
+  "@gatewayStopped": {
+    "description": "Gateway stopped snackbar"
+  },
+
+  "gatewayStarted": "Gateway started successfully!",
+  "@gatewayStarted": {
+    "description": "Gateway started snackbar"
+  },
+
+  "gatewayFailed": "Gateway failed: {error}",
+  "@gatewayFailed": {
+    "description": "Gateway failure snackbar",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+
+  "exceptionError": "Exception: {error}",
+  "@exceptionError": {
+    "description": "Generic exception message",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+
+  "pairingRequestApproved": "Pairing request approved",
+  "@pairingRequestApproved": {
+    "description": "Pairing approved snackbar"
+  },
+
+  "pairingRequestRejected": "Pairing request rejected",
+  "@pairingRequestRejected": {
+    "description": "Pairing rejected snackbar"
+  },
+
+  "addDevice": "Add Device",
+  "@addDevice": {
+    "description": "Add device dialog title"
+  },
+
+  "telegramConfigSaved": "Telegram configuration saved",
+  "@telegramConfigSaved": {
+    "description": "Telegram config saved snackbar"
+  },
+
+  "discordConfigSaved": "Discord configuration saved",
+  "@discordConfigSaved": {
+    "description": "Discord config saved snackbar"
+  },
+
+  "securityMethod": "Security Method",
+  "@securityMethod": {
+    "description": "Security method section header"
+  },
+
+  "pairingRecommended": "Pairing (Recommended)",
+  "@pairingRecommended": {
+    "description": "Security mode option"
+  },
+
+  "pairingDescription": "New users get a pairing code. You approve or reject them.",
+  "@pairingDescription": {
+    "description": "Pairing mode description"
+  },
+
+  "allowlistTitle": "Allowlist",
+  "@allowlistTitle": {
+    "description": "Security mode option"
+  },
+
+  "allowlistDescription": "Only specific user IDs can access the bot.",
+  "@allowlistDescription": {
+    "description": "Allowlist mode description"
+  },
+
+  "openAccess": "Open",
+  "@openAccess": {
+    "description": "Security mode option"
+  },
+
+  "openAccessDescription": "Anyone can use the bot immediately (not recommended).",
+  "@openAccessDescription": {
+    "description": "Open access description"
+  },
+
+  "disabledAccess": "Disabled",
+  "@disabledAccess": {
+    "description": "Security mode option"
+  },
+
+  "disabledAccessDescription": "No DMs allowed. Bot will not respond to any messages.",
+  "@disabledAccessDescription": {
+    "description": "Disabled access description"
+  },
+
+  "approvedDevices": "Approved Devices",
+  "@approvedDevices": {
+    "description": "Approved devices section header"
+  },
+
+  "noApprovedDevicesYet": "No approved devices yet",
+  "@noApprovedDevicesYet": {
+    "description": "Empty approved devices"
+  },
+
+  "devicesAppearAfterApproval": "Devices will appear here after you approve their pairing requests",
+  "@devicesAppearAfterApproval": {
+    "description": "Empty devices hint"
+  },
+
+  "noAllowedUsersConfigured": "No allowed users configured",
+  "@noAllowedUsersConfigured": {
+    "description": "Empty allowed users"
+  },
+
+  "addUserIdsHint": "Add user IDs to allow them to use the bot",
+  "@addUserIdsHint": {
+    "description": "Empty allowed users hint"
+  },
+
+  "removeDevice": "Remove device?",
+  "@removeDevice": {
+    "description": "Remove device dialog title"
+  },
+
+  "removeAccessFor": "Remove access for {name}?",
+  "@removeAccessFor": {
+    "description": "Remove device confirmation",
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+
+  "saving": "Saving...",
+  "@saving": {
+    "description": "Saving button state"
+  },
+
+  "channelsLabel": "Channels",
+  "@channelsLabel": {
+    "description": "Channels section label in gateway screen"
+  },
+
+  "clawHubAccount": "ClawHub Account",
+  "@clawHubAccount": {
+    "description": "ClawHub account dialog title"
+  },
+
+  "loggedInToClawHub": "You are currently logged in to ClawHub.",
+  "@loggedInToClawHub": {
+    "description": "Logged in status message"
+  },
+
+  "loggedOutFromClawHub": "Logged out from ClawHub",
+  "@loggedOutFromClawHub": {
+    "description": "Logged out snackbar"
+  },
+
+  "login": "Login",
+  "@login": {
+    "description": "Login button"
+  },
+
+  "logout": "Logout",
+  "@logout": {
+    "description": "Logout button"
+  },
+
+  "connect": "Connect",
+  "@connect": {
+    "description": "Connect button"
+  },
+
+  "pasteClawHubToken": "Paste your ClawHub API token",
+  "@pasteClawHubToken": {
+    "description": "ClawHub token hint"
+  },
+
+  "pleaseEnterApiToken": "Please enter an API token",
+  "@pleaseEnterApiToken": {
+    "description": "Token validation message"
+  },
+
+  "successfullyConnected": "Successfully connected to ClawHub",
+  "@successfullyConnected": {
+    "description": "Connection success snackbar"
+  },
+
+  "browseSkillsButton": "Browse Skills",
+  "@browseSkillsButton": {
+    "description": "Browse skills button label"
+  },
+
+  "installSkill": "Install Skill",
+  "@installSkill": {
+    "description": "Install skill button"
+  },
+
+  "incompatibleSkill": "Incompatible Skill",
+  "@incompatibleSkill": {
+    "description": "Incompatible skill dialog title"
+  },
+
+  "incompatibleSkillDesc": "This skill cannot run on mobile (iOS/Android).\n\n{reason}",
+  "@incompatibleSkillDesc": {
+    "description": "Incompatible skill dialog body",
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+
+  "compatibilityWarning": "Compatibility Warning",
+  "@compatibilityWarning": {
+    "description": "Compatibility warning dialog title"
+  },
+
+  "compatibilityWarningDesc": "This skill was designed for desktop and may not work as-is on mobile.\n\n{reason}\n\nWould you like to install an adapted version optimized for mobile?",
+  "@compatibilityWarningDesc": {
+    "description": "Compatibility warning dialog body",
+    "placeholders": {
+      "reason": {
+        "type": "String"
+      }
+    }
+  },
+
+  "ok": "OK",
+  "@ok": {
+    "description": "OK button"
+  },
+
+  "installOriginal": "Install Original",
+  "@installOriginal": {
+    "description": "Install original button"
+  },
+
+  "installAdapted": "Install Adapted",
+  "@installAdapted": {
+    "description": "Install adapted button"
+  },
+
+  "resetSession": "Reset Session",
+  "@resetSession": {
+    "description": "Reset session dialog title"
+  },
+
+  "resetSessionConfirm": "Reset session \"{key}\"? This will clear all messages.",
+  "@resetSessionConfirm": {
+    "description": "Reset session confirmation",
+    "placeholders": {
+      "key": {
+        "type": "String"
+      }
+    }
+  },
+
+  "sessionReset": "Session reset",
+  "@sessionReset": {
+    "description": "Session reset snackbar"
+  },
+
+  "activeSessions": "Active Sessions",
+  "@activeSessions": {
+    "description": "Active sessions section header"
+  },
+
+  "scheduledTasks": "Scheduled Tasks",
+  "@scheduledTasks": {
+    "description": "Scheduled tasks section header"
+  },
+
+  "defaultBadge": "Default",
+  "@defaultBadge": {
+    "description": "Default badge label"
+  },
+
+  "errorGeneric": "Error: {error}",
+  "@errorGeneric": {
+    "description": "Generic error message",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+
+  "fileSaved": "{fileName} saved",
+  "@fileSaved": {
+    "description": "File saved snackbar",
+    "placeholders": {
+      "fileName": {
+        "type": "String"
+      }
+    }
+  },
+
+  "errorSavingFile": "Error saving file: {error}",
+  "@errorSavingFile": {
+    "description": "File save error",
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+
+  "cannotDeleteLastAgent": "Cannot delete the last agent",
+  "@cannotDeleteLastAgent": {
+    "description": "Cannot delete last agent error"
+  },
+
+  "close": "Close",
+  "@close": {
+    "description": "Close button"
+  },
+
+  "nameIsRequired": "Name is required",
+  "@nameIsRequired": {
+    "description": "Name validation error"
+  },
+
+  "pleaseSelectModel": "Please select a model",
+  "@pleaseSelectModel": {
+    "description": "Model validation error"
+  },
+
+  "temperatureLabel": "Temperature: {value}",
+  "@temperatureLabel": {
+    "description": "Temperature slider label",
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+
+  "maxTokens": "Max Tokens",
+  "@maxTokens": {
+    "description": "Max tokens field label"
+  },
+
+  "maxTokensRequired": "Max tokens is required",
+  "@maxTokensRequired": {
+    "description": "Max tokens validation error"
+  },
+
+  "mustBePositiveNumber": "Must be a positive number",
+  "@mustBePositiveNumber": {
+    "description": "Number validation error"
+  },
+
+  "maxToolIterations": "Max Tool Iterations",
+  "@maxToolIterations": {
+    "description": "Max iterations field label"
+  },
+
+  "maxIterationsRequired": "Max iterations is required",
+  "@maxIterationsRequired": {
+    "description": "Max iterations validation error"
+  },
+
+  "restrictToWorkspace": "Restrict to Workspace",
+  "@restrictToWorkspace": {
+    "description": "Workspace restriction toggle"
+  },
+
+  "restrictToWorkspaceDesc": "Limit file operations to agent workspace",
+  "@restrictToWorkspaceDesc": {
+    "description": "Workspace restriction description"
+  },
+
+  "noModelsConfiguredLong": "Please add at least one model in Settings before creating an agent.",
+  "@noModelsConfiguredLong": {
+    "description": "Long no models message"
+  },
+
+  "selectProviderFirst": "Select a provider first",
+  "@selectProviderFirst": {
+    "description": "Provider not selected placeholder"
+  },
+
+  "skip": "Skip",
+  "@skip": {
+    "description": "Skip button"
+  },
+
+  "continueButton": "Continue",
+  "@continueButton": {
+    "description": "Continue button"
+  },
+
+  "uiAutomation": "UI Automation",
+  "@uiAutomation": {
+    "description": "Accessibility page title"
+  },
+
+  "uiAutomationDesc": "FlutterClaw can control your screen on your behalf — tapping buttons, filling forms, scrolling, and automating repetitive tasks across any app.",
+  "@uiAutomationDesc": {
+    "description": "UI automation description"
+  },
+
+  "uiAutomationAccessibilityNote": "This requires enabling the Accessibility Service in Android Settings. You can skip this and enable it later.",
+  "@uiAutomationAccessibilityNote": {
+    "description": "Accessibility service note"
+  },
+
+  "openAccessibilitySettings": "Open Accessibility Settings",
+  "@openAccessibilitySettings": {
+    "description": "Open accessibility settings button"
+  },
+
+  "skipForNow": "Skip for now",
+  "@skipForNow": {
+    "description": "Skip for now button"
+  },
+
+  "checkingPermission": "Checking permission…",
+  "@checkingPermission": {
+    "description": "Permission check status"
+  },
+
+  "accessibilityEnabled": "Accessibility Service is enabled",
+  "@accessibilityEnabled": {
+    "description": "Accessibility enabled status"
+  },
+
+  "accessibilityNotEnabled": "Accessibility Service is not enabled",
+  "@accessibilityNotEnabled": {
+    "description": "Accessibility not enabled status"
+  },
+
+  "exploreIntegrations": "Explore Integrations",
+  "@exploreIntegrations": {
+    "description": "Explore integrations button"
+  },
+
+  "requestTimedOut": "Request timed out",
+  "@requestTimedOut": {
+    "description": "Request timeout error"
+  },
+
+  "myShortcuts": "My Shortcuts",
+  "@myShortcuts": {
+    "description": "Shortcuts screen title"
+  },
+
+  "addShortcut": "Add Shortcut",
+  "@addShortcut": {
+    "description": "Add shortcut button/dialog title"
+  },
+
+  "noShortcutsYet": "No shortcuts yet",
+  "@noShortcutsYet": {
+    "description": "Empty shortcuts message"
+  },
+
+  "shortcutsInstructions": "Create a shortcut in the iOS Shortcuts app, add the callback action at the end, then register it here so the AI can run it.",
+  "@shortcutsInstructions": {
+    "description": "Shortcuts empty state instructions"
+  },
+
+  "shortcutName": "Shortcut name",
+  "@shortcutName": {
+    "description": "Shortcut name field label"
+  },
+
+  "shortcutNameHint": "Exact name from the Shortcuts app",
+  "@shortcutNameHint": {
+    "description": "Shortcut name hint"
+  },
+
+  "descriptionOptional": "Description (optional)",
+  "@descriptionOptional": {
+    "description": "Optional description field label"
+  },
+
+  "whatDoesShortcutDo": "What does this shortcut do?",
+  "@whatDoesShortcutDo": {
+    "description": "Shortcut description hint"
+  },
+
+  "callbackSetup": "Callback setup",
+  "@callbackSetup": {
+    "description": "Callback setup section title"
+  },
+
+  "callbackInstructions": "Each shortcut must end with:\n① Get Value for Key → \"callbackUrl\" (from Shortcut Input parsed as dict)\n② Open URLs ← output of ①",
+  "@callbackInstructions": {
+    "description": "Callback setup instructions"
+  },
+
+  "channelApp": "App",
+  "@channelApp": {
+    "description": "App channel label"
+  },
+
+  "channelHeartbeat": "Heartbeat",
+  "@channelHeartbeat": {
+    "description": "Heartbeat channel label"
+  },
+
+  "channelCron": "Cron",
+  "@channelCron": {
+    "description": "Cron channel label"
+  },
+
+  "channelSubagent": "Subagent",
+  "@channelSubagent": {
+    "description": "Subagent channel label"
+  },
+
+  "channelSystem": "System",
+  "@channelSystem": {
+    "description": "System channel label"
+  },
+
+  "secondsAgo": "{seconds}s ago",
+  "@secondsAgo": {
+    "description": "Seconds ago time format",
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+
+  "messagesAbbrev": "msgs",
+  "@messagesAbbrev": {
+    "description": "Messages abbreviation"
+  }
+}

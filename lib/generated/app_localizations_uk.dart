@@ -1,0 +1,1084 @@
+// ignore: unused_import
+import 'package:intl/intl.dart' as intl;
+import 'app_localizations.dart';
+
+// ignore_for_file: type=lint
+
+/// The translations for Ukrainian (`uk`).
+class AppLocalizationsUk extends AppLocalizations {
+  AppLocalizationsUk([String locale = 'uk']) : super(locale);
+
+  @override
+  String get appTitle => 'FlutterClaw';
+
+  @override
+  String get chat => 'Чат';
+
+  @override
+  String get channels => 'Канали';
+
+  @override
+  String get agent => 'Агент';
+
+  @override
+  String get settings => 'Налаштування';
+
+  @override
+  String get getStarted => 'Почати';
+
+  @override
+  String get yourPersonalAssistant => 'Ваш особистий AI-асистент';
+
+  @override
+  String get multiChannelChat => 'Багатоканальний чат';
+
+  @override
+  String get multiChannelChatDesc => 'Telegram, Discord, WebChat та інше';
+
+  @override
+  String get powerfulAIModels => 'Потужні моделі AI';
+
+  @override
+  String get powerfulAIModelsDesc =>
+      'OpenAI, Anthropic, Grok та безкоштовні моделі';
+
+  @override
+  String get localGateway => 'Локальний шлюз';
+
+  @override
+  String get localGatewayDesc =>
+      'Працює на вашому пристрої, ваші дані залишаються вашими';
+
+  @override
+  String get chooseProvider => 'Виберіть Провайдера';
+
+  @override
+  String get selectProviderDesc =>
+      'Виберіть, як ви хочете підключитися до моделей AI.';
+
+  @override
+  String get startForFree => 'Почати Безкоштовно';
+
+  @override
+  String get freeProvidersDesc =>
+      'Ці провайдери пропонують безкоштовні моделі для початку без витрат.';
+
+  @override
+  String get free => 'БЕЗКОШТОВНО';
+
+  @override
+  String get otherProviders => 'Інші Провайдери';
+
+  @override
+  String connectToProvider(String provider) {
+    return 'Підключитися до $provider';
+  }
+
+  @override
+  String get enterApiKeyDesc => 'Введіть ваш API-ключ і виберіть модель.';
+
+  @override
+  String get dontHaveApiKey => 'Немає API-ключа?';
+
+  @override
+  String get createAccountCopyKey =>
+      'Створіть обліковий запис і скопіюйте ключ.';
+
+  @override
+  String get signUp => 'Зареєструватися';
+
+  @override
+  String get apiKey => 'API-ключ';
+
+  @override
+  String get pasteFromClipboard => 'Вставити з буфера обміну';
+
+  @override
+  String get apiBaseUrl => 'Базова URL API';
+
+  @override
+  String get selectModel => 'Вибрати Модель';
+
+  @override
+  String get modelId => 'ID Моделі';
+
+  @override
+  String get validateKey => 'Перевірити Ключ';
+
+  @override
+  String get validating => 'Перевірка...';
+
+  @override
+  String get invalidApiKey => 'Недійсний API-ключ';
+
+  @override
+  String get gatewayConfiguration => 'Конфігурація Шлюзу';
+
+  @override
+  String get gatewayConfigDesc =>
+      'Шлюз - це локальна площина управління вашого асистента.';
+
+  @override
+  String get defaultSettingsNote =>
+      'Налаштування за замовчуванням працюють для більшості користувачів. Змінюйте лише якщо знаєте, що вам потрібно.';
+
+  @override
+  String get host => 'Хост';
+
+  @override
+  String get port => 'Порт';
+
+  @override
+  String get autoStartGateway => 'Автозапуск шлюзу';
+
+  @override
+  String get autoStartGatewayDesc =>
+      'Запускати шлюз автоматично при запуску додатку.';
+
+  @override
+  String get channelsPageTitle => 'Канали';
+
+  @override
+  String get channelsPageDesc =>
+      'Підключіть канали обміну повідомленнями за бажанням. Ви завжди можете налаштувати їх пізніше в Налаштуваннях.';
+
+  @override
+  String get telegram => 'Telegram';
+
+  @override
+  String get connectTelegramBot => 'Підключіть бота Telegram.';
+
+  @override
+  String get openBotFather => 'Відкрити BotFather';
+
+  @override
+  String get discord => 'Discord';
+
+  @override
+  String get connectDiscordBot => 'Підключіть бота Discord.';
+
+  @override
+  String get developerPortal => 'Портал Розробника';
+
+  @override
+  String get botToken => 'Токен Бота';
+
+  @override
+  String telegramBotToken(String platform) {
+    return 'Токен Бота $platform';
+  }
+
+  @override
+  String get readyToGo => 'Готово до Запуску';
+
+  @override
+  String get reviewConfiguration =>
+      'Перевірте конфігурацію і запустіть FlutterClaw.';
+
+  @override
+  String get model => 'Модель';
+
+  @override
+  String viaProvider(String provider) {
+    return 'через $provider';
+  }
+
+  @override
+  String get gateway => 'Шлюз';
+
+  @override
+  String get webChatOnly => 'Тільки WebChat (можете додати більше пізніше)';
+
+  @override
+  String get webChat => 'WebChat';
+
+  @override
+  String get starting => 'Запуск...';
+
+  @override
+  String get startFlutterClaw => 'Запустити FlutterClaw';
+
+  @override
+  String get newSession => 'Нова сесія';
+
+  @override
+  String get photoLibrary => 'Бібліотека Фото';
+
+  @override
+  String get camera => 'Камера';
+
+  @override
+  String get whatDoYouSeeInImage => 'Що ви бачите на цьому зображенні?';
+
+  @override
+  String get imagePickerNotAvailable =>
+      'Вибір зображень недоступний у симуляторі. Використовуйте реальний пристрій.';
+
+  @override
+  String get couldNotOpenImagePicker => 'Не вдалося відкрити вибір зображень.';
+
+  @override
+  String get copiedToClipboard => 'Скопійовано в буфер обміну';
+
+  @override
+  String get attachImage => 'Прикріпити зображення';
+
+  @override
+  String get messageFlutterClaw => 'Повідомлення FlutterClaw...';
+
+  @override
+  String get channelsAndGateway => 'Канали та Шлюз';
+
+  @override
+  String get stop => 'Зупинити';
+
+  @override
+  String get start => 'Запустити';
+
+  @override
+  String status(String status) {
+    return 'Статус: $status';
+  }
+
+  @override
+  String get builtInChatInterface => 'Вбудований інтерфейс чату';
+
+  @override
+  String get notConfigured => 'Не налаштовано';
+
+  @override
+  String get connected => 'Підключено';
+
+  @override
+  String get configuredStarting => 'Налаштовано (запуск...)';
+
+  @override
+  String get telegramConfiguration => 'Конфігурація Telegram';
+
+  @override
+  String get fromBotFather => 'Від @BotFather';
+
+  @override
+  String get allowedUserIds => 'Дозволені ID користувачів (через кому)';
+
+  @override
+  String get leaveEmptyToAllowAll => 'Залиште порожнім, щоб дозволити всім';
+
+  @override
+  String get cancel => 'Скасувати';
+
+  @override
+  String get saveAndConnect => 'Зберегти та Підключити';
+
+  @override
+  String get discordConfiguration => 'Конфігурація Discord';
+
+  @override
+  String get pendingPairingRequests => 'Очікувані Запити на Парування';
+
+  @override
+  String get approve => 'Затвердити';
+
+  @override
+  String get reject => 'Відхилити';
+
+  @override
+  String get expired => 'Закінчився';
+
+  @override
+  String minutesLeft(int minutes) {
+    return 'Залишилось $minutesхв';
+  }
+
+  @override
+  String get workspaceFiles => 'Файли Робочого Простору';
+
+  @override
+  String get personalAIAssistant => 'Особистий AI-Асистент';
+
+  @override
+  String sessionsCount(int count) {
+    return 'Сесії ($count)';
+  }
+
+  @override
+  String get noActiveSessions => 'Немає активних сесій';
+
+  @override
+  String get startConversationToCreate => 'Почніть розмову, щоб створити';
+
+  @override
+  String get startConversationToSee =>
+      'Почніть розмову, щоб побачити сесії тут';
+
+  @override
+  String get reset => 'Скинути';
+
+  @override
+  String get cronJobs => 'Заплановані Завдання';
+
+  @override
+  String get noCronJobs => 'Немає запланованих завдань';
+
+  @override
+  String get addScheduledTasks =>
+      'Додайте заплановані завдання для вашого агента';
+
+  @override
+  String get runNow => 'Виконати Зараз';
+
+  @override
+  String get enable => 'Увімкнути';
+
+  @override
+  String get disable => 'Вимкнути';
+
+  @override
+  String get delete => 'Видалити';
+
+  @override
+  String get skills => 'Навички';
+
+  @override
+  String get browseClawHub => 'Переглянути ClawHub';
+
+  @override
+  String get noSkillsInstalled => 'Навички не встановлені';
+
+  @override
+  String get browseClawHubToAdd => 'Перегляньте ClawHub, щоб додати навички';
+
+  @override
+  String removeSkillConfirm(String name) {
+    return 'Видалити \"$name\" з ваших навичок?';
+  }
+
+  @override
+  String get clawHubSkills => 'Навички ClawHub';
+
+  @override
+  String get searchSkills => 'Пошук навичок...';
+
+  @override
+  String get noSkillsFound => 'Навички не знайдені. Спробуйте інший пошук.';
+
+  @override
+  String installedSkill(String name) {
+    return '$name встановлено';
+  }
+
+  @override
+  String failedToInstallSkill(String name) {
+    return 'Не вдалося встановити $name';
+  }
+
+  @override
+  String get addCronJob => 'Додати Заплановане Завдання';
+
+  @override
+  String get jobName => 'Назва Завдання';
+
+  @override
+  String get dailySummaryExample => 'напр. Щоденна Зведення';
+
+  @override
+  String get taskPrompt => 'Опис Завдання';
+
+  @override
+  String get whatShouldAgentDo => 'Що має робити агент?';
+
+  @override
+  String get interval => 'Інтервал';
+
+  @override
+  String get every5Minutes => 'Кожні 5 хвилин';
+
+  @override
+  String get every15Minutes => 'Кожні 15 хвилин';
+
+  @override
+  String get every30Minutes => 'Кожні 30 хвилин';
+
+  @override
+  String get everyHour => 'Щогодини';
+
+  @override
+  String get every6Hours => 'Кожні 6 годин';
+
+  @override
+  String get every12Hours => 'Кожні 12 годин';
+
+  @override
+  String get every24Hours => 'Кожні 24 години';
+
+  @override
+  String get add => 'Додати';
+
+  @override
+  String get save => 'Зберегти';
+
+  @override
+  String get sessions => 'Сесії';
+
+  @override
+  String messagesCount(int count) {
+    return '$count повідомлень';
+  }
+
+  @override
+  String tokensCount(int count) {
+    return '$count токенів';
+  }
+
+  @override
+  String get compact => 'Стиснути';
+
+  @override
+  String get models => 'Моделі';
+
+  @override
+  String get noModelsConfigured => 'Моделі не налаштовані';
+
+  @override
+  String get addModelToStartChatting =>
+      'Додайте модель, щоб почати спілкування';
+
+  @override
+  String get addModel => 'Додати Модель';
+
+  @override
+  String get default_ => 'ЗА ЗАМОВЧУВАННЯМ';
+
+  @override
+  String get autoStart => 'Автозапуск';
+
+  @override
+  String get startGatewayWhenLaunches => 'Запускати шлюз при запуску додатку';
+
+  @override
+  String get heartbeat => 'Серцебиття';
+
+  @override
+  String get enabled => 'Увімкнено';
+
+  @override
+  String get periodicAgentTasks => 'Періодичні завдання агента з HEARTBEAT.md';
+
+  @override
+  String intervalMinutes(int minutes) {
+    return '$minutes хв';
+  }
+
+  @override
+  String get about => 'Про Програму';
+
+  @override
+  String get personalAIAssistantForIOS =>
+      'Особистий AI-Асистент для iOS та Android';
+
+  @override
+  String get version => 'Версія';
+
+  @override
+  String get basedOnOpenClaw => 'Засновано на OpenClaw';
+
+  @override
+  String get removeModel => 'Видалити модель?';
+
+  @override
+  String removeModelConfirm(String name) {
+    return 'Видалити \"$name\" з ваших моделей?';
+  }
+
+  @override
+  String get remove => 'Видалити';
+
+  @override
+  String get setAsDefault => 'Встановити За Замовчуванням';
+
+  @override
+  String get paste => 'Вставити';
+
+  @override
+  String get chooseProviderStep => '1. Вибрати Провайдера';
+
+  @override
+  String get selectModelStep => '2. Вибрати Модель';
+
+  @override
+  String get apiKeyStep => '3. API-ключ';
+
+  @override
+  String getApiKeyAt(String provider) {
+    return 'Отримати API-ключ на $provider';
+  }
+
+  @override
+  String get justNow => 'щойно';
+
+  @override
+  String minutesAgo(int minutes) {
+    return '$minutesхв тому';
+  }
+
+  @override
+  String hoursAgo(int hours) {
+    return '$hoursгод тому';
+  }
+
+  @override
+  String daysAgo(int days) {
+    return '$daysд тому';
+  }
+
+  @override
+  String get microphonePermissionDenied => 'Дозвіл на мікрофон відхилено';
+
+  @override
+  String liveTranscriptionUnavailable(String error) {
+    return 'Живе транскрибування недоступне: $error';
+  }
+
+  @override
+  String failedToStartRecording(String error) {
+    return 'Не вдалося розпочати запис: $error';
+  }
+
+  @override
+  String get usingOnDeviceTranscription =>
+      'Використання транскрибування на пристрої';
+
+  @override
+  String get transcribingWithWhisper =>
+      'Транскрибування за допомогою Whisper API...';
+
+  @override
+  String whisperApiFailed(String error) {
+    return 'Whisper API не вдалося: $error';
+  }
+
+  @override
+  String get noTranscriptionCaptured => 'Транскрибування не захоплено';
+
+  @override
+  String failedToStopRecording(String error) {
+    return 'Не вдалося зупинити запис: $error';
+  }
+
+  @override
+  String failedToPauseResume(String action, String error) {
+    return 'Не вдалося $action: $error';
+  }
+
+  @override
+  String get pause => 'Пауза';
+
+  @override
+  String get resume => 'Відновити';
+
+  @override
+  String get send => 'Надіслати';
+
+  @override
+  String get liveActivityActive => 'Жива активність активна';
+
+  @override
+  String get restartGateway => 'Перезапустити шлюз';
+
+  @override
+  String modelLabel(String model) {
+    return 'Модель: $model';
+  }
+
+  @override
+  String uptimeLabel(String uptime) {
+    return 'Час роботи: $uptime';
+  }
+
+  @override
+  String get iosBackgroundAudioActive =>
+      'iOS: Фонове аудіо активне - шлюз працює у фоновому режимі';
+
+  @override
+  String get webChatBuiltIn => 'Вбудований інтерфейс чату';
+
+  @override
+  String get configure => 'Налаштувати';
+
+  @override
+  String get disconnect => 'Від\'єднати';
+
+  @override
+  String get agents => 'Агенти';
+
+  @override
+  String get agentFiles => 'Файли Агента';
+
+  @override
+  String get createAgent => 'Створити Агента';
+
+  @override
+  String get editAgent => 'Редагувати Агента';
+
+  @override
+  String get noAgentsYet => 'Агентів ще немає';
+
+  @override
+  String get createYourFirstAgent => 'Створіть свого першого агента!';
+
+  @override
+  String get active => 'Активний';
+
+  @override
+  String get agentName => 'Ім\'я Агента';
+
+  @override
+  String get emoji => 'Емодзі';
+
+  @override
+  String get selectEmoji => 'Вибрати Емодзі';
+
+  @override
+  String get vibe => 'Стиль';
+
+  @override
+  String get vibeHint => 'напр. дружній, формальний, саркастичний';
+
+  @override
+  String get modelConfiguration => 'Конфігурація Моделі';
+
+  @override
+  String get advancedSettings => 'Розширені Налаштування';
+
+  @override
+  String get agentCreated => 'Агента створено';
+
+  @override
+  String get agentUpdated => 'Агента оновлено';
+
+  @override
+  String get agentDeleted => 'Агента видалено';
+
+  @override
+  String switchedToAgent(String name) {
+    return 'Перемкнуто на $name';
+  }
+
+  @override
+  String deleteAgentConfirm(String name) {
+    return 'Видалити $name? Це видалить усі дані робочого простору.';
+  }
+
+  @override
+  String get agentDetails => 'Деталі Агента';
+
+  @override
+  String get createdAt => 'Створено';
+
+  @override
+  String get lastUsed => 'Останнє використання';
+
+  @override
+  String get basicInformation => 'Основна Інформація';
+
+  @override
+  String get switchToAgent => 'Змінити Агента';
+
+  @override
+  String get providers => 'Провайдери';
+
+  @override
+  String get addProvider => 'Додати провайдера';
+
+  @override
+  String get noProvidersConfigured => 'Провайдери не налаштовані.';
+
+  @override
+  String get editCredentials => 'Редагувати облікові дані';
+
+  @override
+  String get defaultModelHint =>
+      'Модель за замовчуванням використовується агентами, які не вказують власну.';
+
+  @override
+  String get holdToSetAsDefault => 'Утримуйте, щоб встановити за замовчуванням';
+
+  @override
+  String get integrations => 'Інтеграції';
+
+  @override
+  String get shortcutsIntegrations => 'Інтеграції Shortcuts';
+
+  @override
+  String get shortcutsIntegrationsDesc =>
+      'Встановіть iOS Shortcuts для запуску дій сторонніх додатків';
+
+  @override
+  String get dangerZone => 'Небезпечна зона';
+
+  @override
+  String get resetOnboarding => 'Скинути і перезапустити налаштування';
+
+  @override
+  String get resetOnboardingDesc =>
+      'Видаляє всю конфігурацію і повертає до майстра налаштування.';
+
+  @override
+  String get resetAllConfiguration => 'Скинути всю конфігурацію?';
+
+  @override
+  String get resetAllConfigurationDesc =>
+      'Це видалить ваші API-ключі, моделі та всі налаштування. Додаток повернеться до майстра налаштування.\n\nІсторія розмов не видаляється.';
+
+  @override
+  String get removeProvider => 'Видалити провайдера';
+
+  @override
+  String removeProviderConfirm(String provider) {
+    return 'Видалити облікові дані для $provider?';
+  }
+
+  @override
+  String modelSetAsDefault(String name) {
+    return '$name встановлено як модель за замовчуванням';
+  }
+
+  @override
+  String get photoImage => 'Фото / Зображення';
+
+  @override
+  String get documentPdfTxt => 'Документ (PDF / TXT)';
+
+  @override
+  String couldNotOpenDocument(String error) {
+    return 'Не вдалося відкрити документ: $error';
+  }
+
+  @override
+  String get retry => 'Повторити';
+
+  @override
+  String get gatewayStopped => 'Шлюз зупинено';
+
+  @override
+  String get gatewayStarted => 'Шлюз успішно запущено!';
+
+  @override
+  String gatewayFailed(String error) {
+    return 'Шлюз не вдалося: $error';
+  }
+
+  @override
+  String exceptionError(String error) {
+    return 'Виняток: $error';
+  }
+
+  @override
+  String get pairingRequestApproved => 'Запит на парування затверджено';
+
+  @override
+  String get pairingRequestRejected => 'Запит на парування відхилено';
+
+  @override
+  String get addDevice => 'Додати Пристрій';
+
+  @override
+  String get telegramConfigSaved => 'Конфігурацію Telegram збережено';
+
+  @override
+  String get discordConfigSaved => 'Конфігурацію Discord збережено';
+
+  @override
+  String get securityMethod => 'Метод Безпеки';
+
+  @override
+  String get pairingRecommended => 'Парування (Рекомендовано)';
+
+  @override
+  String get pairingDescription =>
+      'Нові користувачі отримують код парування. Ви затверджуєте або відхиляєте їх.';
+
+  @override
+  String get allowlistTitle => 'Список дозволених';
+
+  @override
+  String get allowlistDescription =>
+      'Лише конкретні ID користувачів можуть отримати доступ до бота.';
+
+  @override
+  String get openAccess => 'Відкритий';
+
+  @override
+  String get openAccessDescription =>
+      'Будь-хто може використовувати бота негайно (не рекомендовано).';
+
+  @override
+  String get disabledAccess => 'Вимкнено';
+
+  @override
+  String get disabledAccessDescription =>
+      'Приватні повідомлення заборонені. Бот не відповідатиме на жодні повідомлення.';
+
+  @override
+  String get approvedDevices => 'Затверджені Пристрої';
+
+  @override
+  String get noApprovedDevicesYet => 'Затверджених пристроїв ще немає';
+
+  @override
+  String get devicesAppearAfterApproval =>
+      'Пристрої з\'являться тут після затвердження запитів на парування';
+
+  @override
+  String get noAllowedUsersConfigured => 'Дозволені користувачі не налаштовані';
+
+  @override
+  String get addUserIdsHint =>
+      'Додайте ID користувачів, щоб дозволити їм використовувати бота';
+
+  @override
+  String get removeDevice => 'Видалити пристрій?';
+
+  @override
+  String removeAccessFor(String name) {
+    return 'Видалити доступ для $name?';
+  }
+
+  @override
+  String get saving => 'Збереження...';
+
+  @override
+  String get channelsLabel => 'Канали';
+
+  @override
+  String get clawHubAccount => 'Обліковий запис ClawHub';
+
+  @override
+  String get loggedInToClawHub => 'Ви зараз увійшли в ClawHub.';
+
+  @override
+  String get loggedOutFromClawHub => 'Вийшли з ClawHub';
+
+  @override
+  String get login => 'Увійти';
+
+  @override
+  String get logout => 'Вийти';
+
+  @override
+  String get connect => 'Підключити';
+
+  @override
+  String get pasteClawHubToken => 'Вставте ваш токен API ClawHub';
+
+  @override
+  String get pleaseEnterApiToken => 'Будь ласка, введіть токен API';
+
+  @override
+  String get successfullyConnected => 'Успішно підключено до ClawHub';
+
+  @override
+  String get browseSkillsButton => 'Переглянути Навички';
+
+  @override
+  String get installSkill => 'Встановити Навичку';
+
+  @override
+  String get incompatibleSkill => 'Несумісна Навичка';
+
+  @override
+  String incompatibleSkillDesc(String reason) {
+    return 'Ця навичка не може працювати на мобільному пристрої (iOS/Android).\n\n$reason';
+  }
+
+  @override
+  String get compatibilityWarning => 'Попередження про Сумісність';
+
+  @override
+  String compatibilityWarningDesc(String reason) {
+    return 'Ця навичка була розроблена для десктопу і може не працювати на мобільному.\n\n$reason\n\nБажаєте встановити адаптовану версію, оптимізовану для мобільного?';
+  }
+
+  @override
+  String get ok => 'OK';
+
+  @override
+  String get installOriginal => 'Встановити Оригінал';
+
+  @override
+  String get installAdapted => 'Встановити Адаптовану';
+
+  @override
+  String get resetSession => 'Скинути Сесію';
+
+  @override
+  String resetSessionConfirm(String key) {
+    return 'Скинути сесію \"$key\"? Це видалить усі повідомлення.';
+  }
+
+  @override
+  String get sessionReset => 'Сесію скинуто';
+
+  @override
+  String get activeSessions => 'Активні Сесії';
+
+  @override
+  String get scheduledTasks => 'Заплановані Завдання';
+
+  @override
+  String get defaultBadge => 'За замовчуванням';
+
+  @override
+  String errorGeneric(String error) {
+    return 'Помилка: $error';
+  }
+
+  @override
+  String fileSaved(String fileName) {
+    return '$fileName збережено';
+  }
+
+  @override
+  String errorSavingFile(String error) {
+    return 'Помилка збереження файлу: $error';
+  }
+
+  @override
+  String get cannotDeleteLastAgent => 'Неможливо видалити останнього агента';
+
+  @override
+  String get close => 'Закрити';
+
+  @override
+  String get nameIsRequired => 'Ім\'я обов\'язкове';
+
+  @override
+  String get pleaseSelectModel => 'Будь ласка, виберіть модель';
+
+  @override
+  String temperatureLabel(String value) {
+    return 'Температура: $value';
+  }
+
+  @override
+  String get maxTokens => 'Максимум Токенів';
+
+  @override
+  String get maxTokensRequired => 'Максимум токенів обов\'язковий';
+
+  @override
+  String get mustBePositiveNumber => 'Має бути додатним числом';
+
+  @override
+  String get maxToolIterations => 'Максимум Ітерацій Інструментів';
+
+  @override
+  String get maxIterationsRequired => 'Максимум ітерацій обов\'язковий';
+
+  @override
+  String get restrictToWorkspace => 'Обмежити Робочим Простором';
+
+  @override
+  String get restrictToWorkspaceDesc =>
+      'Обмежити файлові операції робочим простором агента';
+
+  @override
+  String get noModelsConfiguredLong =>
+      'Будь ласка, додайте хоча б одну модель у Налаштуваннях перед створенням агента.';
+
+  @override
+  String get selectProviderFirst => 'Спочатку виберіть провайдера';
+
+  @override
+  String get skip => 'Пропустити';
+
+  @override
+  String get continueButton => 'Продовжити';
+
+  @override
+  String get uiAutomation => 'Автоматизація Інтерфейсу';
+
+  @override
+  String get uiAutomationDesc =>
+      'FlutterClaw може керувати вашим екраном — натискати кнопки, заповнювати форми, прокручувати та автоматизувати повторювані завдання в будь-якому додатку.';
+
+  @override
+  String get uiAutomationAccessibilityNote =>
+      'Це вимагає увімкнення Служби Доступності в налаштуваннях Android. Ви можете пропустити це і увімкнути пізніше.';
+
+  @override
+  String get openAccessibilitySettings => 'Відкрити Налаштування Доступності';
+
+  @override
+  String get skipForNow => 'Пропустити зараз';
+
+  @override
+  String get checkingPermission => 'Перевірка дозволу…';
+
+  @override
+  String get accessibilityEnabled => 'Службу Доступності увімкнено';
+
+  @override
+  String get accessibilityNotEnabled => 'Службу Доступності не увімкнено';
+
+  @override
+  String get exploreIntegrations => 'Огляд Інтеграцій';
+
+  @override
+  String get requestTimedOut => 'Час очікування запиту вичерпано';
+
+  @override
+  String get myShortcuts => 'Мої Ярлики';
+
+  @override
+  String get addShortcut => 'Додати Ярлик';
+
+  @override
+  String get noShortcutsYet => 'Ярликів ще немає';
+
+  @override
+  String get shortcutsInstructions =>
+      'Створіть ярлик у додатку iOS Shortcuts, додайте дію зворотного виклику в кінці, потім зареєструйте тут, щоб AI міг його запускати.';
+
+  @override
+  String get shortcutName => 'Назва ярлика';
+
+  @override
+  String get shortcutNameHint => 'Точна назва з додатку Shortcuts';
+
+  @override
+  String get descriptionOptional => 'Опис (необов\'язково)';
+
+  @override
+  String get whatDoesShortcutDo => 'Що робить цей ярлик?';
+
+  @override
+  String get callbackSetup => 'Налаштування зворотного виклику';
+
+  @override
+  String get callbackInstructions =>
+      'Кожен ярлик повинен закінчуватися:\n① Отримати Значення за Ключем → \"callbackUrl\" (з Вхідних даних Ярлика, розібраних як dict)\n② Відкрити URL ← вихід з ①';
+
+  @override
+  String get channelApp => 'Додаток';
+
+  @override
+  String get channelHeartbeat => 'Серцебиття';
+
+  @override
+  String get channelCron => 'Cron';
+
+  @override
+  String get channelSubagent => 'Субагент';
+
+  @override
+  String get channelSystem => 'Система';
+
+  @override
+  String secondsAgo(int seconds) {
+    return '$secondsс тому';
+  }
+
+  @override
+  String get messagesAbbrev => 'пов';
+}
