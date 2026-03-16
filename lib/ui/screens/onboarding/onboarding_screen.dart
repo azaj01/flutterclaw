@@ -168,6 +168,9 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       ref.read(providerRouterProvider);
       ref.read(agentLoopProvider);
 
+      // Start channel adapters (Telegram, Discord) now that config is saved
+      await ref.read(channelStartupProvider.future);
+
       // Start gateway
       if (_gatewayResult.autoStart) {
         if (Platform.isAndroid) {
