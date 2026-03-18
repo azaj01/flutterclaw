@@ -10,6 +10,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutterclaw/core/app_providers.dart';
 import 'package:flutterclaw/l10n/l10n_extension.dart';
+import 'package:flutterclaw/services/analytics_service.dart';
 import 'package:flutterclaw/ui/widgets/agent_switcher_chip.dart';
 
 // ---------------------------------------------------------------------------
@@ -199,6 +200,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     _controller.clear();
     _isNearBottom = true;
     _focusNode.requestFocus();
+
+    await ref.read(analyticsServiceProvider).logAction(
+      name: 'send_message',
+      parameters: {
+        'length': text.length,
+      },
+    );
 
     await ref.read(chatProvider.notifier).sendMessage(text);
   }

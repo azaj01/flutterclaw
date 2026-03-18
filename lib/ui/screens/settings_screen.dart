@@ -9,6 +9,7 @@ import 'package:flutterclaw/data/models/config.dart';
 import 'package:flutterclaw/data/models/model_catalog.dart';
 import 'package:flutterclaw/l10n/l10n_extension.dart';
 import 'package:flutterclaw/ui/screens/onboarding/onboarding_screen.dart';
+import 'package:flutterclaw/services/analytics_service.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -22,6 +23,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final configManager = ref.watch(configManagerProvider);
     final config = configManager.config;
+    final analytics = ref.read(analyticsServiceProvider);
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
@@ -283,7 +285,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
             child: OutlinedButton.icon(
-              onPressed: () => _showAddModelFlow(context),
+              onPressed: () {
+                analytics.logTap(name: 'settings_add_model');
+                _showAddModelFlow(context);
+              },
               icon: const Icon(Icons.add),
               label: Text(context.l10n.addModel),
             ),
