@@ -463,7 +463,7 @@ class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.headphones, size: 16, color: Colors.blue),
+                          Icon(Icons.mobile_friendly, size: 16, color: Colors.blue),
                           const SizedBox(width: 8),
                           Expanded(
                             child: Text(

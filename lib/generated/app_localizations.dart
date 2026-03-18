@@ -1178,7 +1178,7 @@ abstract class AppLocalizations {
   /// **'Uptime: {uptime}'**
   String uptimeLabel(String uptime);
 
-  /// iOS background support message
+  /// iOS background mode message
   ///
   /// In en, this message translates to:
   /// **'iOS: Background support enabled - gateway can continue responding'**

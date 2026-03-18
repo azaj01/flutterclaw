@@ -579,8 +579,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String get iosBackgroundSupportActive =>
-      'iOS：后台支持已激活 - 网关可以继续响应';
+  String get iosBackgroundSupportActive => 'iOS：后台支持已激活 - 网关可以继续响应';
 
   @override
   String get webChatBuiltIn => '内置聊天界面';
