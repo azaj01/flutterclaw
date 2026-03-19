@@ -486,8 +486,14 @@ class WasmSandboxHandler {
             return CreateSessionResult(error: "C2WNet: invalid pipe fds")
         }
 
-        // Write ready probe immediately — buffered in pipe until shell starts.
-        let probe = "echo \"__WAMR_READY__\"\n"
+        // Write ready probe + DNS config immediately — buffered in pipe until shell starts.
+        // Configure DNS to use Google (8.8.8.8) + Cloudflare (1.1.1.1) for internet access.
+        let probe = """
+            echo "nameserver 8.8.8.8" > /etc/resolv.conf
+            echo "nameserver 1.1.1.1" >> /etc/resolv.conf
+            echo "__WAMR_READY__"
+
+            """
         let probeData = probe.data(using: .utf8)!
         probeData.withUnsafeBytes { ptr in
             _ = write(stdinWrite, ptr.baseAddress!, probeData.count)
@@ -528,8 +534,14 @@ class WasmSandboxHandler {
         let flags = fcntl(outPipe[0], F_GETFL, 0)
         fcntl(outPipe[0], F_SETFL, flags | O_NONBLOCK)
 
-        // Write ready probe immediately — buffered in pipe until shell starts.
-        let probe = "echo \"__WAMR_READY__\"\n"
+        // Write ready probe + DNS config immediately — buffered in pipe until shell starts.
+        // Configure DNS to use Google (8.8.8.8) + Cloudflare (1.1.1.1) for internet access.
+        let probe = """
+            echo "nameserver 8.8.8.8" > /etc/resolv.conf
+            echo "nameserver 1.1.1.1" >> /etc/resolv.conf
+            echo "__WAMR_READY__"
+
+            """
         let probeData = probe.data(using: .utf8)!
         probeData.withUnsafeBytes { ptr in
             _ = write(inPipe[1], ptr.baseAddress!, probeData.count)
