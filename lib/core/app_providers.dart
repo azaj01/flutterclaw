@@ -13,6 +13,8 @@ import 'package:flutterclaw/channels/router.dart';
 import 'package:flutterclaw/channels/telegram.dart';
 import 'package:flutterclaw/channels/webchat.dart';
 import 'package:flutterclaw/channels/whatsapp.dart';
+import 'package:flutterclaw/channels/slack.dart';
+import 'package:flutterclaw/channels/signal.dart';
 import 'package:flutterclaw/core/agent/chat_commands.dart';
 import 'package:flutterclaw/core/agent/message_queue.dart';
 import 'package:flutterclaw/core/providers/provider_interface.dart';
@@ -56,6 +58,9 @@ import 'package:flutterclaw/services/notification_service.dart';
 import 'package:flutterclaw/services/sandbox_service.dart';
 import 'package:flutterclaw/services/ui_automation_service.dart';
 import 'package:flutterclaw/tools/sandbox_tools.dart';
+import 'package:flutterclaw/tools/image_gen_tools.dart';
+import 'package:flutterclaw/services/voice_recording_service.dart';
+import 'package:flutterclaw/services/audio_transcription_service.dart';
 
 final configManagerProvider = Provider<ConfigManager>((ref) {
   return ConfigManager();
@@ -171,6 +176,9 @@ final toolRegistryProvider = Provider<ToolRegistry>((ref) {
 
   final registry = ToolRegistry();
 
+  // Apply tool policies from config
+  registry.setDisabledTools(configManager.config.tools.disabled);
+
   Future<String> wsPath() => configManager.workspacePath;
 
   registry.register(ReadFileTool(wsPath));
@@ -182,6 +190,7 @@ final toolRegistryProvider = Provider<ToolRegistry>((ref) {
   final headlessBrowser = HeadlessBrowserTool();
   registry.register(WebFetchTool(headlessBrowser: headlessBrowser));
   registry.register(HttpRequestTool());
+  registry.register(ImageGenTool(configManager: configManager));
   registry.register(headlessBrowser);
   registry.register(MemorySearchTool(wsPath));
   registry.register(MemoryGetTool(wsPath));
@@ -669,6 +678,42 @@ final channelStartupProvider = FutureProvider<void>((ref) async {
     );
   }
 
+  // Wire Slack adapter if configured (Socket Mode — no public URL needed)
+  if (config.channels.slack.enabled &&
+      config.channels.slack.botToken != null &&
+      config.channels.slack.botToken!.isNotEmpty &&
+      config.channels.slack.appToken != null &&
+      config.channels.slack.appToken!.isNotEmpty) {
+    final slack = SlackChannelAdapter(
+      botToken: config.channels.slack.botToken!,
+      appToken: config.channels.slack.appToken!,
+      allowedUserIds: config.channels.slack.allowFrom,
+      chatCommandHandler: (sessionKey, command) async {
+        final result = await commandHandler.handle(sessionKey, command);
+        return result.handled ? result.response : null;
+      },
+    );
+    router.registerAdapter(slack);
+  }
+
+  // Wire Signal adapter (via signal-cli-rest-api proxy)
+  if (config.channels.signal.enabled &&
+      config.channels.signal.apiUrl != null &&
+      config.channels.signal.apiUrl!.isNotEmpty &&
+      config.channels.signal.account != null &&
+      config.channels.signal.account!.isNotEmpty) {
+    final signal = SignalChannelAdapter(
+      apiUrl: config.channels.signal.apiUrl!,
+      account: config.channels.signal.account!,
+      allowedNumbers: config.channels.signal.allowFrom,
+      chatCommandHandler: (sessionKey, command) async {
+        final result = await commandHandler.handle(sessionKey, command);
+        return result.handled ? result.response : null;
+      },
+    );
+    router.registerAdapter(signal);
+  }
+
   // Start all registered adapters
   await router.start();
 
@@ -707,6 +752,8 @@ class ChatMessage {
   final DateTime timestamp;
   final bool isStreaming;
   final bool isToolStatus;
+  /// When non-null, the tool result that can be shown on expand.
+  final String? toolResultText;
 
   // Image message fields
   final String? imageData; // base64-encoded image bytes
@@ -724,6 +771,7 @@ class ChatMessage {
     required this.timestamp,
     this.isStreaming = false,
     this.isToolStatus = false,
+    this.toolResultText,
     this.imageData,
     this.imageMimeType,
     this.isDocumentMessage = false,
@@ -735,6 +783,7 @@ class ChatMessage {
   ChatMessage copyWith({
     String? text,
     bool? isStreaming,
+    String? toolResultText,
     String? imageData,
     String? imageMimeType,
   }) => ChatMessage(
@@ -743,6 +792,7 @@ class ChatMessage {
     timestamp: timestamp,
     isStreaming: isStreaming ?? this.isStreaming,
     isToolStatus: isToolStatus,
+    toolResultText: toolResultText ?? this.toolResultText,
     imageData: imageData ?? this.imageData,
     imageMimeType: imageMimeType ?? this.imageMimeType,
   );
@@ -783,12 +833,34 @@ final chatProvider = NotifierProvider<ChatNotifier, List<ChatMessage>>(
   ChatNotifier.new,
 );
 
+/// Singleton voice recorder — shared between the provider and UI so
+/// [isRecording] can be read without extra state.
+final voiceRecordingServiceProvider = Provider<VoiceRecordingService>((ref) {
+  final svc = VoiceRecordingService();
+  ref.onDispose(svc.dispose);
+  return svc;
+});
+
 class ChatNotifier extends Notifier<List<ChatMessage>> {
   bool _processing = false;
   bool get isProcessing => _processing;
+  bool _cancelled = false;
   bool _hatchTriggered = false;
   String? _historyLoadedForAgent; // agentId whose history is currently loaded
   bool _isAppInBackground = false;
+
+  /// Cancel the current streaming response. The active stream loop checks this
+  /// flag on each event and breaks early, finalising the partial response.
+  void cancelProcessing() {
+    if (!_processing) return;
+    _cancelled = true;
+    // Immediately mark the last assistant bubble as done so the UI updates.
+    final updated = List<ChatMessage>.from(state);
+    if (updated.isNotEmpty && !updated.last.isUser) {
+      updated[updated.length - 1] = updated.last.copyWith(isStreaming: false);
+      state = updated;
+    }
+  }
 
   /// Returns the session key currently being viewed in the chat screen.
   String _getSessionKey() => ref.read(activeSessionKeyProvider);
@@ -972,6 +1044,7 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
 
     // Hatch: trigger the agent without persisting a visible user message.
     // The BOOTSTRAP.md in the system prompt tells the agent what to do.
+    _cancelled = false;
     _processing = true;
     state = [
       ChatMessage(
@@ -998,6 +1071,8 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
         chatId: 'default',
         userLanguage: userLanguage,
       )) {
+        if (_cancelled) break;
+
         if (event.toolName != null) {
           final updated = List<ChatMessage>.from(state);
           updated.insert(
@@ -1046,6 +1121,7 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
       }
       state = updated;
     } finally {
+      _cancelled = false;
       _processing = false;
       if (startedAudio && !IosGatewayService.isRunning) {
         Future.delayed(const Duration(seconds: 30), () {
@@ -1116,6 +1192,7 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
         chatId: 'default',
         contentBlocks: contentBlocks,
       )) {
+        if (_cancelled) break;
         if (event.textDelta != null) {
           buffer.write(event.textDelta);
           final updated = List<ChatMessage>.from(state);
@@ -1146,6 +1223,7 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
       );
       state = updated;
     } finally {
+      _cancelled = false;
       _processing = false;
       if (startedAudio && !IosGatewayService.isRunning) {
         Future.delayed(const Duration(seconds: 30), () {
@@ -1180,6 +1258,7 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
       ),
     ];
 
+    _cancelled = false;
     _processing = true;
 
     state = [
@@ -1221,6 +1300,7 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
         chatId: 'default',
         contentBlocks: contentBlocks,
       )) {
+        if (_cancelled) break;
         if (event.textDelta != null) {
           buffer.write(event.textDelta);
           final updated = List<ChatMessage>.from(state);
@@ -1251,6 +1331,7 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
       );
       state = updated;
     } finally {
+      _cancelled = false;
       _processing = false;
       if (startedAudio && !IosGatewayService.isRunning) {
         Future.delayed(const Duration(seconds: 30), () {
@@ -1292,6 +1373,7 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
     required bool showUserMessage,
   }) async {
     if (_processing) return;
+    _cancelled = false;
 
     if (showUserMessage) {
       state = [
@@ -1323,13 +1405,32 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
 
     try {
       final buffer = StringBuffer();
+      // Throttle text-delta state updates to ~30 fps to avoid rebuilding the
+      // full message list on every streamed character. Tool events and isDone
+      // always flush immediately regardless of the throttle.
+      var lastFlush = DateTime.now();
+      const flushInterval = Duration(milliseconds: 33);
+
+      void flushBuffer() {
+        if (state.isEmpty) return;
+        final updated = List<ChatMessage>.from(state);
+        updated[updated.length - 1] = updated.last.copyWith(
+          text: buffer.toString(),
+        );
+        state = updated;
+        lastFlush = DateTime.now();
+      }
+
       await for (final event in agentLoop.processMessageStream(
         _getSessionKey(),
         text,
         channelType: 'webchat',
         chatId: 'default',
       )) {
+        if (_cancelled) break;
+
         if (event.toolName != null) {
+          flushBuffer(); // flush pending text before inserting tool pill
           final updated = List<ChatMessage>.from(state);
           updated.insert(
             updated.length - 1,
@@ -1338,18 +1439,40 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
               isUser: false,
               timestamp: DateTime.now(),
               isToolStatus: true,
-              isStreaming: true, // spinner while tool is running
+              isStreaming: true,
             ),
           );
           state = updated;
         }
 
-        if (event.toolResult != null) {
-          // Mark the most recent running tool pill as completed.
+        // Streaming tool output chunk — update the live result text on the pill.
+        if (event.toolResultChunk != null) {
+          final chunk = event.toolResultChunk!;
           final updated = List<ChatMessage>.from(state);
           for (var i = updated.length - 1; i >= 0; i--) {
             if (updated[i].isToolStatus && updated[i].isStreaming == true) {
-              updated[i] = updated[i].copyWith(isStreaming: false);
+              final String newText;
+              if (chunk.startsWith('\x00CLEAR\x00')) {
+                // Replace accumulated text with the final authoritative output.
+                newText = chunk.substring(8);
+              } else {
+                newText = (updated[i].toolResultText ?? '') + chunk;
+              }
+              updated[i] = updated[i].copyWith(toolResultText: newText);
+              break;
+            }
+          }
+          state = updated;
+        }
+
+        if (event.toolResult != null) {
+          final updated = List<ChatMessage>.from(state);
+          for (var i = updated.length - 1; i >= 0; i--) {
+            if (updated[i].isToolStatus && updated[i].isStreaming == true) {
+              updated[i] = updated[i].copyWith(
+                isStreaming: false,
+                toolResultText: event.toolResult,
+              );
               break;
             }
           }
@@ -1358,11 +1481,9 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
 
         if (event.textDelta != null) {
           buffer.write(event.textDelta);
-          final updated = List<ChatMessage>.from(state);
-          updated[updated.length - 1] = updated.last.copyWith(
-            text: buffer.toString(),
-          );
-          state = updated;
+          if (DateTime.now().difference(lastFlush) >= flushInterval) {
+            flushBuffer();
+          }
         }
 
         if (event.isDone) {
@@ -1379,14 +1500,19 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
           }
         }
       }
+      // Flush any remaining buffered text if stream ended without isDone
+      if (buffer.isNotEmpty && state.isNotEmpty && state.last.isStreaming) {
+        flushBuffer();
+      }
     } catch (e) {
       final updated = List<ChatMessage>.from(state);
       updated[updated.length - 1] = updated.last.copyWith(
-        text: 'Error: $e',
+        text: _cancelled ? (state.last.text.isEmpty ? '_(cancelled)_' : state.last.text) : 'Error: $e',
         isStreaming: false,
       );
       state = updated;
     } finally {
+      _cancelled = false;
       _processing = false;
       // Stop background audio if we started it just for this request and the
       // gateway isn't running (which manages its own audio lifecycle). Grace
@@ -1400,6 +1526,40 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
       }
       unawaited(_syncActiveAgentIdentity());
     }
+  }
+
+  /// Transcribe the given audio file and send the result as a chat message.
+  ///
+  /// Uses the configured model's API base (falls back to OpenAI). If the API
+  /// key is for a provider that doesn't support Whisper (e.g. Anthropic), the
+  /// transcription will fail gracefully and return false.
+  Future<bool> transcribeAndSend(String audioFilePath, {String? language}) async {
+    if (_processing) return false;
+
+    final config = ref.read(configManagerProvider).config;
+    final modelName =
+        config.activeAgent?.modelName ?? config.agents.defaults.modelName;
+    final entry = config.getModel(modelName);
+    if (entry == null) return false;
+
+    final apiKey = config.resolveApiKey(entry);
+    if (apiKey.isEmpty) return false;
+
+    // Use the model's configured API base; Anthropic doesn't have Whisper so
+    // fall back to OpenAI for transcription in that case.
+    final rawBase = config.resolveApiBase(entry);
+    final apiBase = rawBase.contains('anthropic.com')
+        ? 'https://api.openai.com/v1'
+        : rawBase;
+
+    final svc = AudioTranscriptionService(apiKey: apiKey, apiBase: apiBase);
+    final text = await svc.transcribe(audioFilePath, language: language);
+    await VoiceRecordingService.deleteFile(audioFilePath);
+
+    if (text == null || text.isEmpty) return false;
+
+    await sendMessage(text);
+    return true;
   }
 
   /// Builds a human-readable label for a tool status pill.

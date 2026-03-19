@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:dio/dio.dart';
 import 'package:flutterclaw/data/models/model_catalog.dart';
 import 'package:flutterclaw/l10n/l10n_extension.dart';
+import 'package:flutterclaw/services/model_discovery_service.dart';
 
 class AuthPage extends StatefulWidget {
   final String providerId;
@@ -11,6 +14,8 @@ class AuthPage extends StatefulWidget {
   final String? initialModelId;
   final String? initialApiBase;
   final ValueChanged<AuthResult> onChanged;
+  /// Called with `true` when the key validates successfully, `false` on failure.
+  final ValueChanged<bool>? onValidated;
 
   const AuthPage({
     super.key,
@@ -19,6 +24,7 @@ class AuthPage extends StatefulWidget {
     this.initialModelId,
     this.initialApiBase,
     required this.onChanged,
+    this.onValidated,
   });
 
   @override
@@ -49,6 +55,9 @@ class _AuthPageState extends State<AuthPage> {
   bool _useCustomModel = false;
   bool _isValidating = false;
   _ValidationResult? _validationResult;
+  Timer? _debounce;
+  List<DiscoveredModel> _discoveredModels = [];
+  bool _isDiscovering = false;
 
   @override
   void initState() {
@@ -68,12 +77,24 @@ class _AuthPageState extends State<AuthPage> {
       _selectedModelId = freeModel?.id ?? models.first.id;
     }
 
-    _apiKeyController.addListener(_emitChange);
+    _apiKeyController.addListener(_onApiKeyChanged);
+  }
+
+  void _onApiKeyChanged() {
+    _emitChange();
+    // Clear previous result and auto-validate after 800ms of no typing.
+    if (_validationResult != null) setState(() => _validationResult = null);
+    _debounce?.cancel();
+    final key = _apiKeyController.text.trim();
+    if (key.isNotEmpty) {
+      _debounce = Timer(const Duration(milliseconds: 800), _validate);
+    }
   }
 
   @override
   void dispose() {
-    _apiKeyController.removeListener(_emitChange);
+    _debounce?.cancel();
+    _apiKeyController.removeListener(_onApiKeyChanged);
     _apiKeyController.dispose();
     _apiBaseController.dispose();
     _customModelController.dispose();
@@ -143,25 +164,20 @@ class _AuthPageState extends State<AuthPage> {
 
       final status = response.statusCode ?? 0;
 
+      _ValidationResult result;
       if (isOpenRouter) {
-        // OpenRouter /auth/key returns 200 with {data: {label, ...}} for valid keys
         if (status == 200 && response.data is Map<String, dynamic>) {
           final data = (response.data as Map<String, dynamic>)['data'];
-          if (data != null) {
-            setState(() => _validationResult = _ValidationResult.success);
-          } else {
-            setState(() => _validationResult =
-                _ValidationResult.failed('Invalid API key'));
-          }
+          result = data != null
+              ? _ValidationResult.success
+              : _ValidationResult.failed('Invalid API key');
         } else {
-          setState(() => _validationResult =
-              _ValidationResult.failed('Invalid API key'));
+          result = _ValidationResult.failed('Invalid API key');
         }
       } else if (status >= 200 && status < 300) {
-        setState(() => _validationResult = _ValidationResult.success);
+        result = _ValidationResult.success;
       } else if (status == 401 || status == 403) {
-        setState(() =>
-            _validationResult = _ValidationResult.failed('Invalid API key'));
+        result = _ValidationResult.failed('Invalid API key');
       } else {
         String msg = 'HTTP $status';
         if (response.data is Map<String, dynamic>) {
@@ -171,8 +187,10 @@ class _AuthPageState extends State<AuthPage> {
             msg = '${error['message']}';
           }
         }
-        setState(() => _validationResult = _ValidationResult.failed(msg));
+        result = _ValidationResult.failed(msg);
       }
+      setState(() => _validationResult = result);
+      widget.onValidated?.call(result.isSuccess);
     } on DioException catch (e) {
       if (!mounted) return;
       final msg = e.type == DioExceptionType.connectionTimeout ||
@@ -180,10 +198,11 @@ class _AuthPageState extends State<AuthPage> {
           ? 'Request timed out'
           : e.message ?? 'Connection error';
       setState(() => _validationResult = _ValidationResult.failed(msg));
+      widget.onValidated?.call(false);
     } catch (e) {
       if (!mounted) return;
-      setState(() =>
-          _validationResult = _ValidationResult.failed('$e'));
+      setState(() => _validationResult = _ValidationResult.failed('$e'));
+      widget.onValidated?.call(false);
     } finally {
       if (mounted) setState(() => _isValidating = false);
     }
@@ -366,6 +385,47 @@ class _AuthPageState extends State<AuthPage> {
           ),
         ],
 
+        // Discover models button — shown for Ollama/custom or when no
+        // static models exist for the provider.
+        if (models.isEmpty || widget.providerId == 'ollama' || widget.providerId == 'custom') ...[
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: _isDiscovering ? null : _discoverModels,
+            icon: _isDiscovering
+                ? const SizedBox(
+                    width: 14, height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.search, size: 16),
+            label: Text(_isDiscovering ? 'Discovering...' : 'Discover available models'),
+          ),
+          if (_discoveredModels.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text('${_discoveredModels.length} models found',
+                style: theme.textTheme.labelSmall
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+            const SizedBox(height: 4),
+            ...(_discoveredModels.take(20).map((m) => _ModelTile(
+                  model: m.toCatalogModel(),
+                  isSelected: !_useCustomModel && _selectedModelId == m.id,
+                  onTap: () {
+                    setState(() {
+                      _useCustomModel = false;
+                      _selectedModelId = m.id;
+                      _customModelController.clear();
+                    });
+                    _emitChange();
+                  },
+                ))),
+            if (_discoveredModels.length > 20)
+              TextButton(
+                onPressed: () {
+                  setState(() => _useCustomModel = true);
+                },
+                child: Text('+ ${_discoveredModels.length - 20} more — enter ID manually'),
+              ),
+          ],
+        ],
+
         const SizedBox(height: 24),
 
         // Validate button
@@ -400,6 +460,37 @@ class _AuthPageState extends State<AuthPage> {
         ),
       ],
     );
+  }
+
+  Future<void> _discoverModels() async {
+    if (_isDiscovering) return;
+    setState(() {
+      _isDiscovering = true;
+      _discoveredModels = [];
+    });
+    try {
+      final provider = ModelCatalog.getProvider(widget.providerId);
+      final apiBase = _apiBaseController.text.trim().isNotEmpty
+          ? _apiBaseController.text.trim()
+          : provider?.apiBase;
+      final svc = ModelDiscoveryService();
+      final found = await svc.discoverModels(
+        providerId: widget.providerId,
+        apiKey: _apiKeyController.text.trim(),
+        apiBase: apiBase,
+      );
+      if (!mounted) return;
+      setState(() => _discoveredModels = found);
+      // Auto-select the first discovered model if nothing is selected yet.
+      if (found.isNotEmpty && _selectedModelId == null) {
+        setState(() => _selectedModelId = found.first.id);
+        _emitChange();
+      }
+    } catch (_) {
+      // Ignore — discovery is best-effort
+    } finally {
+      if (mounted) setState(() => _isDiscovering = false);
+    }
   }
 
   Future<void> _openSignup(String url) async {
