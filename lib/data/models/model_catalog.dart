@@ -136,6 +136,15 @@ class ModelCatalog {
       input: ['text', 'image'],
     ),
     CatalogModel(
+      id: 'minimax/minimax-m2.5:free',
+      displayName: 'MiniMax M2.5',
+      providerId: 'openrouter',
+      isFree: true,
+      contextWindow: 196608,
+      description: 'MiniMax reasoning model — free',
+      input: ['text'],
+    ),
+    CatalogModel(
       id: 'nvidia/nemotron-3-super-120b-a12b:free',
       displayName: 'Nemotron 3 Super 120B',
       providerId: 'openrouter',
