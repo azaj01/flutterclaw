@@ -147,7 +147,7 @@ class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
                             }
                             ref
                                 .read(gatewayStateProvider.notifier)
-                                .setModel(config.agents.defaults.modelName);
+                                .setModel(config.activeAgent?.modelName ?? config.agents.defaults.modelName);
                           },
                           child: Text('Retry'),
                         )
@@ -239,7 +239,7 @@ class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
                                       ref
                                           .read(gatewayStateProvider.notifier)
                                           .setModel(
-                                            config.agents.defaults.modelName,
+                                            config.activeAgent?.modelName ?? config.agents.defaults.modelName,
                                           );
                                     }
                                   } catch (e) {                                    if (context.mounted) {
@@ -312,7 +312,7 @@ class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
                             }
                             ref
                                 .read(gatewayStateProvider.notifier)
-                                .setModel(config.agents.defaults.modelName);
+                                .setModel(config.activeAgent?.modelName ?? config.agents.defaults.modelName);
                           },
                         ),
                       ],
@@ -356,7 +356,7 @@ class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
                               ),
                               const SizedBox(width: 8),
                               Text(
-                                'Model: ${gatewayState.currentModel.isNotEmpty ? gatewayState.currentModel : config.agents.defaults.modelName}',
+                                'Model: ${gatewayState.currentModel.isNotEmpty ? gatewayState.currentModel : config.activeAgent?.modelName ?? config.agents.defaults.modelName}',
                                 style: theme.textTheme.bodySmall?.copyWith(
                                   color: theme.colorScheme.onSurfaceVariant,
                                 ),

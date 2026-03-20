@@ -1,8 +1,12 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutterclaw/channels/channel_interface.dart';
+import 'package:flutterclaw/services/audio_transcription_service.dart';
 import 'package:logging/logging.dart';
+import 'package:path_provider/path_provider.dart';
 
 /// Routes messages between channel adapters and the agent.
 ///
@@ -10,10 +14,12 @@ import 'package:logging/logging.dart';
 /// - Sends outgoing messages to the correct channel adapter
 /// - Provides per-channel session isolation via session keys
 /// - Buffers outgoing messages when a channel is offline
+/// - Transcribes incoming voice messages via Whisper API before forwarding
 class ChannelRouter {
   ChannelRouter({
     this.agentHandler,
     this.maxQueueSize = 100,
+    this.transcriptionServiceFactory,
   });
 
   final _log = Logger('ChannelRouter');
@@ -23,6 +29,10 @@ class ChannelRouter {
 
   /// Called for each incoming message. Set this to your agent's handler.
   MessageHandler? agentHandler;
+
+  /// Factory that returns an [AudioTranscriptionService] for transcribing
+  /// incoming voice messages. If null, voice messages are silently ignored.
+  AudioTranscriptionService? Function()? transcriptionServiceFactory;
 
   bool _running = false;
 
@@ -138,10 +148,86 @@ class ChannelRouter {
       _log.fine('No agent handler set, dropping incoming message');
       return;
     }
+
+    var processed = message;
+
+    // Transcribe voice messages before forwarding to the agent.
+    if (message.audioBytes != null) {
+      processed = await _transcribeVoice(message);
+    }
+
     try {
-      await handler(message);
+      await handler(processed);
     } catch (e, st) {
       _log.severe('Agent handler error', e, st);
+    }
+  }
+
+  /// Transcribe audio bytes to text via Whisper API and return updated message.
+  ///
+  /// On failure or missing transcription service, returns the original message
+  /// with text set to a fallback notice so the agent still gets something.
+  Future<IncomingMessage> _transcribeVoice(IncomingMessage message) async {
+    final svc = transcriptionServiceFactory?.call();
+    if (svc == null) {
+      _log.warning(
+        'Voice message received on ${message.channelType} but no transcription '
+        'service configured — forwarding as placeholder',
+      );
+      return message.copyWith(
+        text: '[Voice message received — transcription not configured]',
+        clearAudio: true,
+        channelContext: {
+          ...?message.channelContext,
+          'isVoiceMessage': true,
+          'transcriptionFailed': true,
+        },
+      );
+    }
+
+    try {
+      final dir = await getTemporaryDirectory();
+      final ext = message.audioFormat ?? 'ogg';
+      final tempPath =
+          '${dir.path}/ch_voice_${DateTime.now().millisecondsSinceEpoch}.$ext';
+
+      await File(tempPath).writeAsBytes(message.audioBytes as Uint8List);
+      final transcript = await svc.transcribe(tempPath);
+      await File(tempPath).delete();
+
+      if (transcript == null || transcript.isEmpty) {
+        _log.warning('Transcription returned empty for ${message.channelType}');
+        return message.copyWith(
+          text: '[Voice message — transcription failed]',
+          clearAudio: true,
+          channelContext: {
+            ...?message.channelContext,
+            'isVoiceMessage': true,
+            'transcriptionFailed': true,
+          },
+        );
+      }
+
+      _log.info('Transcribed voice (${message.channelType}): ${transcript.length} chars');
+      return message.copyWith(
+        text: transcript,
+        clearAudio: true,
+        channelContext: {
+          ...?message.channelContext,
+          'isVoiceMessage': true,
+        },
+      );
+    } catch (e, st) {
+      _log.severe('Voice transcription error', e, st);
+      return message.copyWith(
+        text: '[Voice message — transcription error]',
+        clearAudio: true,
+        channelContext: {
+          ...?message.channelContext,
+          'isVoiceMessage': true,
+          'transcriptionFailed': true,
+        },
+      );
     }
   }
 }

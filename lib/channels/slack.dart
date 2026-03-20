@@ -14,6 +14,7 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:logging/logging.dart';
@@ -179,7 +180,7 @@ class SlackChannelAdapter implements ChannelAdapter {
     }
   }
 
-  void _handleEventPayload(Map<String, dynamic>? payload) {
+  void _handleEventPayload(Map<String, dynamic>? payload) async {
     if (payload == null) return;
     final event = payload['event'] as Map<String, dynamic>?;
     if (event == null) return;
@@ -222,6 +223,44 @@ class SlackChannelAdapter implements ChannelAdapter {
       return;
     }
 
+    // Check for audio file attachments
+    Uint8List? audioBytes;
+    String? audioFormat;
+    final files = event['files'] as List<dynamic>?;
+    if (files != null) {
+      for (final f in files) {
+        final file = f as Map<String, dynamic>;
+        final mime = file['mimetype'] as String? ?? '';
+        if (mime.startsWith('audio/')) {
+          final dlUrl = file['url_private_download'] as String?
+              ?? file['url_private'] as String?;
+          if (dlUrl != null) {
+            try {
+              final dlDio = Dio(BaseOptions(
+                headers: {'Authorization': 'Bearer $botToken'},
+              ));
+              final res = await dlDio.get<List<int>>(
+                dlUrl,
+                options: Options(responseType: ResponseType.bytes),
+              );
+              if (res.data != null) {
+                audioBytes = Uint8List.fromList(res.data!);
+                audioFormat = mime.contains('ogg') ? 'ogg'
+                    : mime.contains('wav') ? 'wav'
+                    : mime.contains('mp3') || mime.contains('mpeg') ? 'mp3'
+                    : 'm4a';
+              }
+            } catch (e) {
+              _log.warning('Failed to download Slack audio file: $e');
+            }
+            break;
+          }
+        }
+      }
+    }
+
+    if (text.isEmpty && audioBytes == null) return;
+
     final incoming = IncomingMessage(
       channelType: _type,
       senderId: userId,
@@ -231,6 +270,8 @@ class SlackChannelAdapter implements ChannelAdapter {
       messageId: ts,
       replyToMessageId: threadTs,
       timestamp: DateTime.now(),
+      audioBytes: audioBytes,
+      audioFormat: audioFormat,
     );
 
     _handler?.call(incoming).catchError((e) {
@@ -251,6 +292,26 @@ class SlackChannelAdapter implements ChannelAdapter {
     final chunks = <String>[];
     for (var i = 0; i < text.length; i += 3000) {
       chunks.add(text.substring(i, (i + 3000).clamp(0, text.length)));
+    }
+
+    // Upload audio as file if provided
+    if (message.audioBytes != null) {
+      try {
+        final ext = message.audioMimeType?.contains('ogg') == true ? 'ogg' : 'wav';
+        final formData = FormData.fromMap({
+          'channels': message.chatId,
+          'file': MultipartFile.fromBytes(
+            message.audioBytes!,
+            filename: 'voice.$ext',
+          ),
+          'filename': 'voice.$ext',
+          if (message.replyToMessageId != null)
+            'thread_ts': message.replyToMessageId,
+        });
+        await _dio.post('/files.upload', data: formData);
+      } catch (e) {
+        _log.warning('Slack sendVoice error: $e');
+      }
     }
 
     for (final chunk in chunks) {

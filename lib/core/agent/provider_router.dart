@@ -1,6 +1,8 @@
 /// Abstract router for LLM provider selection with failover support.
 library;
 
+import 'package:flutterclaw/core/providers/anthropic_provider.dart';
+import 'package:flutterclaw/core/providers/openai_provider.dart';
 import 'package:flutterclaw/core/providers/provider_interface.dart';
 import 'package:flutterclaw/data/models/config.dart';
 import 'package:logging/logging.dart';
@@ -26,6 +28,16 @@ class SimpleProviderRouter implements ProviderRouter {
       provider.chatCompletionStream(request);
 }
 
+/// Selects the correct [LlmProvider] implementation based on the request's
+/// API base URL. Anthropic uses a different API format from all other
+/// OpenAI-compatible providers (different endpoint, auth header, body).
+LlmProvider _resolveProvider(LlmRequest request) {
+  if (request.apiBase.toLowerCase().contains('anthropic.com')) {
+    return AnthropicProvider();
+  }
+  return OpenAiProvider();
+}
+
 /// Provider router with automatic failover to fallback models.
 class FailoverProviderRouter implements ProviderRouter {
   final LlmProvider primary;
@@ -41,7 +53,7 @@ class FailoverProviderRouter implements ProviderRouter {
   @override
   Future<LlmResponse> chatCompletion(LlmRequest request) async {
     try {
-      return await primary.chatCompletion(request);
+      return await _resolveProvider(request).chatCompletion(request);
     } catch (e) {
       _log.warning('Primary model failed: $e, trying fallbacks...');
       return _tryFallbacks(request, e);
@@ -50,7 +62,7 @@ class FailoverProviderRouter implements ProviderRouter {
 
   @override
   Stream<LlmStreamEvent> chatCompletionStream(LlmRequest request) {
-    return primary.chatCompletionStream(request);
+    return _resolveProvider(request).chatCompletionStream(request);
   }
 
   Future<LlmResponse> _tryFallbacks(LlmRequest request, Object primaryError) async {
@@ -69,8 +81,7 @@ class FailoverProviderRouter implements ProviderRouter {
           apiBase: config.resolveApiBase(fallbackModel),
         );
 
-        final provider = i < fallbacks.length ? fallbacks[i] : primary;
-        return await provider.chatCompletion(fallbackRequest);
+        return await _resolveProvider(fallbackRequest).chatCompletion(fallbackRequest);
       } catch (e) {
         _log.warning('Fallback ${fallbackModel.modelName} also failed: $e');
       }

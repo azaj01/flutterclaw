@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutterclaw/channels/channel_interface.dart';
@@ -7,6 +8,7 @@ import 'package:flutterclaw/services/pairing_service.dart';
 import 'package:logging/logging.dart';
 
 const _apiBase = 'https://api.telegram.org/bot';
+const _fileBase = 'https://api.telegram.org/file/bot';
 const _type = 'telegram';
 
 class TelegramChannelAdapter implements ChannelAdapter {
@@ -146,8 +148,13 @@ class TelegramChannelAdapter implements ChannelAdapter {
           final senderId = (from['id'] ?? '').toString();
           final senderName = _extractSenderName(from);
           final text = _extractText(message);
+          final photoUrls = _extractPhotoUrls(message);
 
-          if (text.isEmpty && _extractPhotoUrls(message).isEmpty) continue;
+          // Download voice/audio bytes if present
+          final audioData = await _extractAudioBytes(message);
+
+          // Skip empty messages (no text, no photo, no audio)
+          if (text.isEmpty && photoUrls.isEmpty && audioData == null) continue;
 
           if (isGroup && botUsername != null) {
             final mention = '@${botUsername!.replaceFirst('@', '')}';
@@ -177,7 +184,6 @@ class TelegramChannelAdapter implements ChannelAdapter {
           final replyTo = message['reply_to_message'] != null
               ? (message['reply_to_message'] as Map<String, dynamic>)['message_id'] as int?
               : null;
-          final photoUrls = _extractPhotoUrls(message);
 
           final incoming = IncomingMessage(
             channelType: _type,
@@ -189,6 +195,9 @@ class TelegramChannelAdapter implements ChannelAdapter {
             replyToMessageId: replyTo?.toString(),
             timestamp: DateTime.now(),
             photoUrls: photoUrls.isNotEmpty ? photoUrls : null,
+            audioBytes: audioData?.$1,
+            audioFormat: audioData?.$2,
+            audioDuration: audioData?.$3,
           );
 
           // Start typing indicator
@@ -278,6 +287,71 @@ class TelegramChannelAdapter implements ChannelAdapter {
     return urls;
   }
 
+  /// Download audio bytes from a voice/audio message.
+  ///
+  /// Returns a (bytes, format, durationSeconds) tuple or null if not an audio
+  /// message or if download fails.
+  Future<(Uint8List, String, int?)?> _extractAudioBytes(
+    Map<String, dynamic> message,
+  ) async {
+    // Voice messages (PTT) — OGG/Opus
+    final voice = message['voice'] as Map<String, dynamic>?;
+    if (voice != null) {
+      final fileId = voice['file_id'] as String?;
+      final duration = voice['duration'] as int?;
+      if (fileId != null) {
+        final bytes = await _downloadFile(fileId);
+        if (bytes != null) return (bytes, 'ogg', duration);
+      }
+    }
+
+    // Audio file messages
+    final audio = message['audio'] as Map<String, dynamic>?;
+    if (audio != null) {
+      final fileId = audio['file_id'] as String?;
+      final duration = audio['duration'] as int?;
+      final mimeType = audio['mime_type'] as String? ?? '';
+      final ext = _mimeToExt(mimeType);
+      if (fileId != null) {
+        final bytes = await _downloadFile(fileId);
+        if (bytes != null) return (bytes, ext, duration);
+      }
+    }
+
+    return null;
+  }
+
+  /// Fetch file path from Telegram and download bytes.
+  Future<Uint8List?> _downloadFile(String fileId) async {
+    try {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '/getFile',
+        queryParameters: {'file_id': fileId},
+      );
+      final filePath = res.data?['result']?['file_path'] as String?;
+      if (filePath == null) return null;
+
+      final dlDio = Dio();
+      final dlRes = await dlDio.get<List<int>>(
+        '$_fileBase$token/$filePath',
+        options: Options(responseType: ResponseType.bytes),
+      );
+      if (dlRes.data == null) return null;
+      return Uint8List.fromList(dlRes.data!);
+    } catch (e) {
+      _log.warning('Failed to download Telegram file $fileId: $e');
+      return null;
+    }
+  }
+
+  String _mimeToExt(String mime) {
+    if (mime.contains('ogg')) return 'ogg';
+    if (mime.contains('mpeg') || mime.contains('mp3')) return 'mp3';
+    if (mime.contains('mp4') || mime.contains('m4a')) return 'm4a';
+    if (mime.contains('wav')) return 'wav';
+    return 'ogg';
+  }
+
   String _extractSenderName(Map<String, dynamic> from) {
     final first = from['first_name'] as String? ?? '';
     final last = from['last_name'] as String? ?? '';
@@ -313,24 +387,54 @@ class TelegramChannelAdapter implements ChannelAdapter {
   Future<void> sendMessage(OutgoingMessage message) async {
     if (message.channelType != _type) return;
 
-    final chunks = _splitMessage(message.text, 4000);
-    for (final chunk in chunks) {
-      try {
-        final params = <String, dynamic>{
-          'chat_id': message.chatId,
-          'text': chunk,
-          'parse_mode': 'Markdown',
-        };
-        if (message.replyToMessageId != null) {
-          params['reply_to_message_id'] =
-              int.tryParse(message.replyToMessageId!) ??
-                  message.replyToMessageId;
+    // Send voice note if audio is attached
+    if (message.audioBytes != null) {
+      await _sendVoice(message.chatId, message.audioBytes!,
+          replyToMessageId: message.replyToMessageId);
+    }
+
+    // Always also send text
+    if (message.text.isNotEmpty) {
+      final chunks = _splitMessage(message.text, 4000);
+      for (final chunk in chunks) {
+        try {
+          final params = <String, dynamic>{
+            'chat_id': message.chatId,
+            'text': chunk,
+            'parse_mode': 'Markdown',
+          };
+          if (message.replyToMessageId != null) {
+            params['reply_to_message_id'] =
+                int.tryParse(message.replyToMessageId!) ??
+                    message.replyToMessageId;
+          }
+          await _dio.post('/sendMessage', data: params);
+        } catch (e, st) {
+          _log.severe('Failed to send Telegram message', e, st);
+          rethrow;
         }
-        await _dio.post('/sendMessage', data: params);
-      } catch (e, st) {
-        _log.severe('Failed to send Telegram message', e, st);
-        rethrow;
       }
+    }
+  }
+
+  /// Send audio bytes as a Telegram voice note (OGG/Opus expected, but WAV
+  /// is also accepted by Telegram — it re-encodes server-side).
+  Future<void> _sendVoice(
+    String chatId,
+    Uint8List audioBytes, {
+    String? replyToMessageId,
+  }) async {
+    try {
+      final formData = FormData.fromMap({
+        'chat_id': chatId,
+        'voice': MultipartFile.fromBytes(audioBytes, filename: 'voice.ogg'),
+        if (replyToMessageId != null)
+          'reply_to_message_id':
+              int.tryParse(replyToMessageId) ?? replyToMessageId,
+      });
+      await _dio.post('/sendVoice', data: formData);
+    } catch (e, st) {
+      _log.warning('Failed to send Telegram voice message', e, st);
     }
   }
 

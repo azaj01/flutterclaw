@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutterclaw/channels/channel_interface.dart';
@@ -250,6 +251,44 @@ class DiscordChannelAdapter implements ChannelAdapter {
       }
     }
 
+    // Check for audio attachments
+    Uint8List? audioBytes;
+    String? audioFormat;
+    final attachments = d['attachments'] as List<dynamic>?;
+    if (attachments != null) {
+      for (final att in attachments) {
+        final a = att as Map<String, dynamic>;
+        final mime = a['content_type'] as String? ?? '';
+        if (mime.startsWith('audio/')) {
+          final url = a['url'] as String?;
+          if (url != null) {
+            try {
+              final dlDio = Dio();
+              final res = await dlDio.get<List<int>>(
+                url,
+                options: Options(responseType: ResponseType.bytes),
+              );
+              if (res.data != null) {
+                audioBytes = Uint8List.fromList(res.data!);
+                audioFormat = mime.contains('ogg')
+                    ? 'ogg'
+                    : mime.contains('wav')
+                        ? 'wav'
+                        : mime.contains('mp3') || mime.contains('mpeg')
+                            ? 'mp3'
+                            : 'm4a';
+              }
+            } catch (e) {
+              _log.warning('Failed to download Discord audio attachment: $e');
+            }
+            break;
+          }
+        }
+      }
+    }
+
+    if (content.isEmpty && audioBytes == null) return;
+
     final incoming = IncomingMessage(
       channelType: _type,
       senderId: authorId,
@@ -259,6 +298,8 @@ class DiscordChannelAdapter implements ChannelAdapter {
       isGroup: isGroup,
       replyToMessageId: (d['referenced_message'] as Map<String, dynamic>?)?['id'] as String?,
       timestamp: DateTime.now(),
+      audioBytes: audioBytes,
+      audioFormat: audioFormat,
     );
 
     _handler?.call(incoming).catchError((e, st) {
@@ -343,11 +384,29 @@ class DiscordChannelAdapter implements ChannelAdapter {
   Future<void> sendMessage(OutgoingMessage message) async {
     if (message.channelType != _type) return;
     try {
-      final body = <String, dynamic>{'content': message.text};
-      if (message.replyToMessageId != null) {
-        body['message_reference'] = {'message_id': message.replyToMessageId};
+      // Send audio as file attachment if provided
+      if (message.audioBytes != null) {
+        final ext = message.audioMimeType?.contains('ogg') == true ? 'ogg' : 'wav';
+        final formData = FormData.fromMap({
+          'file': MultipartFile.fromBytes(
+            message.audioBytes!,
+            filename: 'voice.$ext',
+            contentType: DioMediaType.parse(message.audioMimeType ?? 'audio/wav'),
+          ),
+          if (message.replyToMessageId != null)
+            'payload_json': '{"message_reference":{"message_id":"${message.replyToMessageId}"}}',
+        });
+        await _dio.post('/channels/${message.chatId}/messages', data: formData);
       }
-      await _sendWithRateLimit(message.chatId, body);
+
+      // Always send text too
+      if (message.text.isNotEmpty) {
+        final body = <String, dynamic>{'content': message.text};
+        if (message.replyToMessageId != null) {
+          body['message_reference'] = {'message_id': message.replyToMessageId};
+        }
+        await _sendWithRateLimit(message.chatId, body);
+      }
     } catch (e, st) {
       _log.severe('Failed to send Discord message', e, st);
       rethrow;

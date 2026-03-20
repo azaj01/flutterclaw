@@ -207,8 +207,14 @@ class AnthropicProvider implements LlmProvider {
   }
 
   String _buildUrl(String apiBase) {
-    final base = apiBase.endsWith('/') ? apiBase : '$apiBase/';
-    return '${base}v1/messages';
+    final trimmed = apiBase.endsWith('/')
+        ? apiBase.substring(0, apiBase.length - 1)
+        : apiBase;
+    // Guard against double /v1/ for configs saved with 'https://api.anthropic.com/v1'
+    if (trimmed.endsWith('/v1')) {
+      return '$trimmed/messages';
+    }
+    return '$trimmed/v1/messages';
   }
 
   Map<String, String> _headers(String apiKey, {bool pdfsBeta = false}) => {
@@ -273,7 +279,7 @@ class AnthropicProvider implements LlmProvider {
 
     if (request.tools != null && request.tools!.isNotEmpty) {
       body['tools'] = _convertToolsToAnthropic(request.tools!);
-      body['tool_choice'] = {'type': 'any'};
+      body['tool_choice'] = {'type': 'auto'};
     }
 
     return body;

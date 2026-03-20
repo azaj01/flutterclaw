@@ -995,46 +995,75 @@ After this introduction, this file will be automatically deleted.
   }
 
   void _migrateStealthModelIds() {
-    // All stealth and MiMo models migrate to the free OpenRouter auto-router.
+    // Migrate deprecated model IDs to their current replacements.
     const deprecatedIds = {
+      // Old stealth/MiMo models → free OpenRouter auto-router
       'openrouter/healer-alpha',
       'openrouter/hunter-alpha',
       'openrouter/xiaomi/mimo-v2-omni',
       'openrouter/xiaomi/mimo-v2-pro',
+      // Old xAI model IDs → current versioned IDs
+      'grok-3',
+      'grok-4-fast',
+      // Old Google Gemini preview ID → stable ID
+      'gemini-2.5-flash-lite-preview-06-17',
+      // Deprecated Groq model
+      'mixtral-8x7b-32768',
     };
     const deprecatedNames = {
       'Healer Alpha',
       'Hunter Alpha',
       'MiMo-V2-Omni',
       'MiMo-V2-Pro',
+      'Grok-3',
+      'Grok-4 Fast',
+      'Gemini 2.5 Flash Lite',
+      'Mixtral 8x7B',
     };
     const targetId = 'openrouter/auto';
     const targetName = 'Free Models Router';
+
+    // Per-model migration overrides (model id → new model id/name)
+    const modelIdOverrides = <String, String>{
+      'grok-3': 'grok-4.20-0309-non-reasoning',
+      'grok-4-fast': 'grok-4-1-fast-non-reasoning',
+      'gemini-2.5-flash-lite-preview-06-17': 'gemini-2.5-flash-lite',
+    };
+    const modelNameOverrides = <String, String>{
+      'grok-3': 'Grok 4',
+      'grok-4-fast': 'Grok 4 Fast',
+      'Grok-3': 'Grok 4',
+      'Grok-4 Fast': 'Grok 4 Fast',
+      'Gemini 2.5 Flash Lite': 'Gemini 2.5 Flash Lite',
+      'Mixtral 8x7B': 'Free Models Router',
+    };
 
     final needsMigration = _config.modelList.any((m) => deprecatedIds.contains(m.model));
     if (!needsMigration) return;
 
     final updatedModels = _config.modelList.map((m) {
       if (!deprecatedIds.contains(m.model)) return m;
+      final newId = modelIdOverrides[m.model] ?? targetId;
+      final newName = modelNameOverrides[m.modelName] ?? targetName;
       return ModelEntry(
-        modelName: targetName,
-        model: targetId,
+        modelName: newName,
+        model: newId,
         apiKey: m.apiKey,
-        apiBase: m.apiBase,
+        apiBase: newId == targetId ? m.apiBase : null, // clear stale base for provider migrations
         requestTimeout: m.requestTimeout,
         provider: m.provider,
-        isFree: true,
+        isFree: newId == targetId,
         input: m.input,
       );
     }).toList();
 
     final updatedAgents = _config.agentProfiles.map((a) {
       if (!deprecatedNames.contains(a.modelName)) return a;
-      return a.copyWith(modelName: targetName);
+      return a.copyWith(modelName: modelNameOverrides[a.modelName] ?? targetName);
     }).toList();
 
     _config = _config.copyWith(modelList: updatedModels, agentProfiles: updatedAgents);
-    debugPrint('[ConfigManager] Migrated stealth/MiMo models to Free Models Router');
+    debugPrint('[ConfigManager] Migrated deprecated model IDs');
   }
 
   Future<void> save() async {

@@ -958,6 +958,12 @@ class _UnifiedAgentsScreenState extends ConsumerState<UnifiedAgentsScreen> {
       ref.invalidate(activeAgentProvider);
       ref.invalidate(agentProfilesProvider);
 
+      // Update Live Activity with the new agent's model if gateway is running
+      final gatewayState = ref.read(gatewayStateProvider);
+      if (gatewayState.isRunning) {
+        ref.read(gatewayStateProvider.notifier).setModel(agent.modelName);
+      }
+
       // Load the new agent's persisted session history in the chat tab
       await ref.read(chatProvider.notifier).switchToAgent();
 
