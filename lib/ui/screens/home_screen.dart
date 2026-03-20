@@ -68,7 +68,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
       if (mounted) {
         gatewayNotifier.setRunning(success);
-        gatewayNotifier.setModel(config.agents.defaults.modelName);
+        gatewayNotifier.setModel(
+          config.activeAgent?.modelName ?? config.agents.defaults.modelName,
+        );
         if (!success && IosGatewayService.lastError != null) {
           gatewayNotifier.setError(IosGatewayService.lastError!);
         }
@@ -80,7 +82,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       await BackgroundService.startService();
       if (mounted) {
         gatewayNotifier.setRunning(true);
-        gatewayNotifier.setModel(config.agents.defaults.modelName);
+        gatewayNotifier.setModel(
+          config.activeAgent?.modelName ?? config.agents.defaults.modelName,
+        );
       }
     }
   }

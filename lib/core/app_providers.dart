@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutterclaw/core/providers/error_parser.dart';
@@ -62,6 +63,7 @@ import 'package:flutterclaw/tools/sandbox_tools.dart';
 import 'package:flutterclaw/tools/image_gen_tools.dart';
 import 'package:flutterclaw/services/voice_recording_service.dart';
 import 'package:flutterclaw/services/audio_transcription_service.dart';
+import 'package:flutterclaw/services/text_to_speech_service.dart';
 
 final configManagerProvider = Provider<ConfigManager>((ref) {
   return ConfigManager();
@@ -447,20 +449,8 @@ final toolRegistryProvider = Provider<ToolRegistry>((ref) {
 
 final providerRouterProvider = Provider<ProviderRouter>((ref) {
   final configManager = ref.read(configManagerProvider);
-  final models = configManager.config.modelList;
-
-  final providers = <LlmProvider>[];
-  for (var i = 0; i < models.length; i++) {
-    providers.add(OpenAiProvider());
-  }
-
-  if (providers.isEmpty) {
-    providers.add(OpenAiProvider());
-  }
-
   return FailoverProviderRouter(
     primary: OpenAiProvider(),
-    fallbacks: providers.length > 1 ? providers.sublist(1) : [],
     configManager: configManager,
   );
 });
@@ -487,12 +477,41 @@ final webChatAdapterProvider = Provider<WebChatChannelAdapter>((ref) {
   return WebChatChannelAdapter();
 });
 
+final textToSpeechServiceProvider = Provider<TextToSpeechService>((ref) {
+  final svc = TextToSpeechService();
+  ref.onDispose(svc.dispose);
+  return svc;
+});
+
+/// Builds an [AudioTranscriptionService] using the currently active model's
+/// API key and base URL. Returns null if no API key is configured.
+AudioTranscriptionService? _buildTranscriptionService(ConfigManager configManager) {
+  final config = configManager.config;
+  final modelName =
+      config.activeAgent?.modelName ?? config.agents.defaults.modelName;
+  final entry = config.getModel(modelName);
+  if (entry == null) return null;
+
+  final apiKey = config.resolveApiKey(entry);
+  if (apiKey.isEmpty) return null;
+
+  final rawBase = config.resolveApiBase(entry);
+  final apiBase = rawBase.contains('anthropic.com')
+      ? 'https://api.openai.com/v1'
+      : rawBase;
+
+  return AudioTranscriptionService(apiKey: apiKey, apiBase: apiBase);
+}
+
 final channelRouterProvider = Provider<ChannelRouter>((ref) {
   final agentLoop = ref.read(agentLoopProvider);
   final webChat = ref.read(webChatAdapterProvider);
+  final configManager = ref.read(configManagerProvider);
+  final tts = ref.read(textToSpeechServiceProvider);
 
   late final ChannelRouter router;
   router = ChannelRouter(
+    transcriptionServiceFactory: () => _buildTranscriptionService(configManager),
     agentHandler: (IncomingMessage msg) async {
       final response = await agentLoop.processMessage(
         msg.sessionKey,
@@ -503,11 +522,30 @@ final channelRouterProvider = Provider<ChannelRouter>((ref) {
         channelContext: msg.channelContext,
       );
 
+      // If the user sent a voice message, reply with audio (voice-to-voice).
+      final wasVoice = msg.channelContext?['isVoiceMessage'] == true;
+      List<int>? voiceBytes;
+      if (wasVoice && msg.channelType != 'webchat') {
+        final audioPath = await tts.synthesizeToFile(response.content);
+        if (audioPath != null) {
+          try {
+            voiceBytes = await File(audioPath).readAsBytes();
+          } finally {
+            await File(audioPath).delete().catchError((_) => File(audioPath));
+          }
+        }
+      }
+
       await router.sendMessage(
         OutgoingMessage(
           channelType: msg.channelType,
           chatId: msg.chatId,
           text: response.content,
+          audioBytes: voiceBytes != null
+              ? Uint8List.fromList(voiceBytes)
+              : null,
+          audioMimeType: 'audio/wav',
+          isVoiceNote: true,
         ),
       );
     },
@@ -588,12 +626,12 @@ final skillsServiceProvider = Provider<SkillsService>((ref) {
       if (apiKey.isEmpty) return null;
 
       final router = model_router.ProviderRouter(config: config);
-      final vendorConfig = router.getVendorConfig(entry.vendor);
+      final vendorConfig = router.getVendorConfig(entry.provider);
       final apiBase =
           entry.apiBase ??
           vendorConfig?.defaultApiBase ??
           'https://api.openai.com/v1';
-      final modelForApi = entry.vendor == 'openrouter'
+      final modelForApi = entry.provider == 'openrouter'
           ? entry.model
           : entry.modelId;
 

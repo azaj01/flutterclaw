@@ -19,6 +19,7 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:logging/logging.dart';
@@ -128,7 +129,35 @@ class SignalChannelAdapter implements ChannelAdapter {
     }
 
     final text = dataMessage['message'] as String? ?? '';
-    if (text.isEmpty) return;
+
+    // Check for audio attachments
+    Uint8List? audioBytes;
+    String? audioFormat;
+    final attachments = dataMessage['attachments'] as List<dynamic>?;
+    if (attachments != null) {
+      for (final att in attachments) {
+        final a = att as Map<String, dynamic>;
+        final mime = a['contentType'] as String? ?? '';
+        if (mime.startsWith('audio/')) {
+          // signal-cli-rest-api exposes attachment data inline as base64
+          final dataB64 = a['data'] as String?;
+          if (dataB64 != null) {
+            try {
+              audioBytes = base64Decode(dataB64);
+              audioFormat = mime.contains('ogg') ? 'ogg'
+                  : mime.contains('wav') ? 'wav'
+                  : mime.contains('mp3') || mime.contains('mpeg') ? 'mp3'
+                  : 'm4a';
+            } catch (e) {
+              _log.warning('Failed to decode Signal audio attachment: $e');
+            }
+          }
+          break;
+        }
+      }
+    }
+
+    if (text.isEmpty && audioBytes == null) return;
 
     final timestamp = envelope['timestamp'] as int? ?? 0;
     final sessionKey = '$_type:$sender';
@@ -156,6 +185,8 @@ class SignalChannelAdapter implements ChannelAdapter {
       timestamp: timestamp > 0
           ? DateTime.fromMillisecondsSinceEpoch(timestamp)
           : DateTime.now(),
+      audioBytes: audioBytes,
+      audioFormat: audioFormat,
     );
 
     _handler?.call(incoming).catchError((e) {
@@ -171,13 +202,23 @@ class SignalChannelAdapter implements ChannelAdapter {
   Future<void> sendMessage(OutgoingMessage message) async {
     if (message.channelType != _type) return;
     try {
+      final body = <String, dynamic>{
+        'message': message.text,
+        'number': account,
+        'recipients': [message.chatId],
+      };
+
+      // Attach audio as base64 if provided
+      if (message.audioBytes != null) {
+        final ext = message.audioMimeType?.contains('ogg') == true ? 'ogg' : 'wav';
+        body['base64_attachments'] = [
+          '${message.audioMimeType ?? 'audio/wav'}:voice.$ext:${base64Encode(message.audioBytes!)}',
+        ];
+      }
+
       await _dio.post(
         '${_baseUrl()}/v1/send',
-        data: jsonEncode({
-          'message': message.text,
-          'number': account,
-          'recipients': [message.chatId],
-        }),
+        data: jsonEncode(body),
         options: Options(
           headers: {'Content-Type': 'application/json'},
           validateStatus: (_) => true,

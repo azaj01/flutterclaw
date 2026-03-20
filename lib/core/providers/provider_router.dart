@@ -49,7 +49,7 @@ class ProviderRouter {
       ),
       'gemini': VendorConfig(
         provider: _openAiProvider,
-        defaultApiBase: 'https://generativelanguage.googleapis.com/v1beta',
+        defaultApiBase: 'https://generativelanguage.googleapis.com/v1beta/openai',
       ),
       'zhipu': VendorConfig(
         provider: _openAiProvider,
@@ -62,6 +62,10 @@ class ProviderRouter {
       'volcengine': VendorConfig(
         provider: _openAiProvider,
         defaultApiBase: 'https://ark.cn-beijing.volces.com/api/v3',
+      ),
+      'xai': VendorConfig(
+        provider: _openAiProvider,
+        defaultApiBase: 'https://api.x.ai/v1',
       ),
       'ollama': VendorConfig(
         provider: _openAiProvider,
