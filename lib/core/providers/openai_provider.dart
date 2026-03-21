@@ -208,8 +208,22 @@ class OpenAiProvider implements LlmProvider {
     // dangling user message without an assistant reply. Sending two consecutive
     // user messages causes OpenAI-compatible APIs to reject the request.
     // Insert a placeholder assistant message between them to keep the alternation valid.
+    //
+    // Additionally, tool results that contain images (e.g. ui_screenshot) are
+    // split: the tool message gets text-only content, and the image is injected
+    // as a follow-up user message. This is necessary because OpenAI-compatible
+    // APIs don't support content arrays in tool role messages.
+    final pendingImages = <Map<String, dynamic>>[];
     final messages = <Map<String, dynamic>>[];
-    for (final m in request.messages) {
+    final msgList = request.messages;
+    for (var i = 0; i < msgList.length; i++) {
+      final m = msgList[i];
+      // Collect images from tool results before conversion strips them
+      if (m.role == 'tool' && m.content is String && request.supportsVision) {
+        final img = _extractImageFromToolContent(m.content as String);
+        if (img != null) pendingImages.add(img);
+      }
+
       final converted = _messageToJson(
         m,
         apiBase: request.apiBase,
@@ -220,6 +234,23 @@ class OpenAiProvider implements LlmProvider {
         messages.add({'role': placeholderRole, 'content': '...'});
       }
       messages.add(converted);
+
+      // After all tool results for this turn, inject images as a user message.
+      // We detect the boundary: current message is 'tool' and next won't be 'tool'.
+      if (m.role == 'tool' && pendingImages.isNotEmpty) {
+        final nextIsTool =
+            i + 1 < msgList.length && msgList[i + 1].role == 'tool';
+        if (!nextIsTool) {
+          messages.add({
+            'role': 'user',
+            'content': [
+              {'type': 'text', 'text': 'Here is the screenshot from the tool call above:'},
+              ...pendingImages,
+            ],
+          });
+          pendingImages.clear();
+        }
+      }
     }
 
     final reasoning = _isReasoningModel(request.model);
@@ -266,11 +297,12 @@ class OpenAiProvider implements LlmProvider {
 
   /// Converts tool result content for OpenAI format.
   ///
-  /// Detects JSON-encoded image blocks (from ui_screenshot) and converts them
-  /// to an OpenAI content array with an image_url block so vision models can
-  /// see the screenshot. When stripImages is true, returns a text placeholder.
-  /// Falls through to plain string for non-image content.
-  dynamic _convertToolContent(String content, {bool stripImages = false}) {
+  /// OpenAI-compatible APIs require tool message `content` to be a **string**
+  /// (content arrays are not supported for the tool role). When the tool result
+  /// contains a JSON-encoded image block (from ui_screenshot), this returns a
+  /// text-only placeholder. The actual image is injected as a follow-up user
+  /// message by [_buildBody] so vision models can still see it.
+  String _convertToolContent(String content, {bool stripImages = false}) {
     if (content.contains('"type":"image"') ||
         content.contains('"type": "image"')) {
       try {
@@ -279,26 +311,34 @@ class OpenAiProvider implements LlmProvider {
             parsed['type'] == 'image' &&
             parsed.containsKey('data') &&
             parsed.containsKey('mimeType')) {
-          if (stripImages) {
-            final note = parsed['note'] as String?;
-            return '[Screenshot captured]${note != null ? ' $note' : ''}';
-          }
-          final blocks = <Map<String, dynamic>>[
-            {
-              'type': 'image_url',
-              'image_url': {
-                'url': 'data:${parsed['mimeType']};base64,${parsed['data']}',
-              },
-            },
-          ];
-          if (parsed['note'] != null) {
-            blocks.add({'type': 'text', 'text': parsed['note'] as String});
-          }
-          return blocks;
+          final note = parsed['note'] as String?;
+          return '[Screenshot captured successfully]${note != null ? ' $note' : ''}';
         }
       } catch (_) {}
     }
     return content;
+  }
+
+  /// Extracts image data from a JSON-encoded tool result content string.
+  /// Returns an OpenAI image_url content block if found, null otherwise.
+  Map<String, dynamic>? _extractImageFromToolContent(String content) {
+    if (!content.contains('"type":"image"') &&
+        !content.contains('"type": "image"')) return null;
+    try {
+      final parsed = jsonDecode(content);
+      if (parsed is Map<String, dynamic> &&
+          parsed['type'] == 'image' &&
+          parsed.containsKey('data') &&
+          parsed.containsKey('mimeType')) {
+        return {
+          'type': 'image_url',
+          'image_url': {
+            'url': 'data:${parsed['mimeType']};base64,${parsed['data']}',
+          },
+        };
+      }
+    } catch (_) {}
+    return null;
   }
 
   /// Converts content to OpenAI format.

@@ -22,6 +22,17 @@ class FlutterClawAccessibilityService : AccessibilityService() {
         var instance: FlutterClawAccessibilityService? = null
 
         fun isRunning() = instance != null
+
+        /** Scale bitmap so its longest side is at most [maxPx]. */
+        fun scaleDown(bmp: android.graphics.Bitmap, maxPx: Int): android.graphics.Bitmap {
+            val w = bmp.width
+            val h = bmp.height
+            if (w <= maxPx && h <= maxPx) return bmp
+            val ratio = maxPx.toFloat() / maxOf(w, h)
+            return android.graphics.Bitmap.createScaledBitmap(
+                bmp, (w * ratio).toInt(), (h * ratio).toInt(), true
+            )
+        }
     }
 
     override fun onServiceConnected() {
@@ -165,12 +176,13 @@ class FlutterClawAccessibilityService : AccessibilityService() {
                             callback(null)
                             return
                         }
-                        // Copy to software bitmap for PNG encoding
                         val softBmp = bmp.copy(android.graphics.Bitmap.Config.ARGB_8888, false)
                         bmp.recycle()
+                        val scaled = scaleDown(softBmp, 1080)
+                        if (scaled !== softBmp) softBmp.recycle()
                         val baos = ByteArrayOutputStream()
-                        softBmp.compress(android.graphics.Bitmap.CompressFormat.PNG, 90, baos)
-                        softBmp.recycle()
+                        scaled.compress(android.graphics.Bitmap.CompressFormat.JPEG, 60, baos)
+                        scaled.recycle()
                         callback(baos.toByteArray())
                     }
 

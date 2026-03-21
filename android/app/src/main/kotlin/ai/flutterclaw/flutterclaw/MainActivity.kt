@@ -200,7 +200,7 @@ class MainActivity : FlutterActivity() {
                     if (bytes != null) {
                         result.success(mapOf(
                             "data" to Base64.encodeToString(bytes, Base64.NO_WRAP),
-                            "mimeType" to "image/png",
+                            "mimeType" to "image/jpeg",
                         ))
                     } else {
                         pixelCopyFallback(result)
@@ -226,13 +226,15 @@ class MainActivity : FlutterActivity() {
         val bitmap = Bitmap.createBitmap(decorView.width, decorView.height, Bitmap.Config.ARGB_8888)
         PixelCopy.request(win, bitmap, { copyResult ->
             if (copyResult == PixelCopy.SUCCESS) {
+                val scaled = FlutterClawAccessibilityService.scaleDown(bitmap, 1080)
+                if (scaled !== bitmap) bitmap.recycle()
                 val baos = ByteArrayOutputStream()
-                bitmap.compress(Bitmap.CompressFormat.PNG, 90, baos)
-                bitmap.recycle()
+                scaled.compress(Bitmap.CompressFormat.JPEG, 60, baos)
+                scaled.recycle()
                 result.success(mapOf(
                     "data" to Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP),
-                    "mimeType" to "image/png",
-                    "note" to "App surface only (PixelCopy fallback — Accessibility Service screenshot requires API 30+)",
+                    "mimeType" to "image/jpeg",
+                    "note" to "App surface only (PixelCopy fallback)",
                 ))
             } else {
                 bitmap.recycle()
