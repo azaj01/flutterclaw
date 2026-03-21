@@ -64,6 +64,8 @@ String _friendlyMessage(int? statusCode, String raw) {
     case 529:
       return 'El proveedor esta sobrecargado. '
           'Intenta de nuevo en unos minutos.';
+    case 400:
+      return 'El proveedor rechazo la solicitud (400): $raw';
     default:
       if (raw.contains('SocketException') ||
           raw.contains('Connection refused')) {
@@ -75,8 +77,7 @@ String _friendlyMessage(int? statusCode, String raw) {
             'Intenta de nuevo.';
       }
       if (statusCode != null) {
-        return 'El proveedor respondio con un error ($statusCode). '
-            'Intenta de nuevo o revisa tu configuracion.';
+        return 'El proveedor respondio con un error ($statusCode): $raw';
       }
       return 'Ocurrio un error al comunicarse con el proveedor. '
           'Intenta de nuevo.';

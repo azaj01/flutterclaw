@@ -323,12 +323,12 @@ class UiScreenshotTool extends Tool {
 
   @override
   String get description =>
-      'Capture the current screen as a PNG image.\n\n'
-      'Android: full-screen capture (all apps) when Accessibility Service is '
-      'enabled and API >= 30; falls back to app-surface-only on older APIs.\n'
-      'iOS: captures the FlutterClaw app surface only.\n\n'
-      'Returns base64-encoded PNG. Pass the result to a vision model to '
-      'understand what is currently on screen before deciding what to tap.';
+      'Capture the current screen and return a description of visible elements.\n\n'
+      'Returns a screenshot image (for vision models) plus a text summary of all '
+      'interactive elements on screen with their positions, so you can decide '
+      'what to tap or click next.\n\n'
+      'Android: full-screen capture when Accessibility Service is enabled.\n'
+      'iOS: captures the FlutterClaw app surface only.';
 
   @override
   Map<String, dynamic> get parameters => {
@@ -338,14 +338,46 @@ class UiScreenshotTool extends Tool {
 
   @override
   Future<ToolResult> execute(Map<String, dynamic> args) async {
-    final r = await _svc.screenshot();
-    if (r['error'] == true) return ToolResult.error(r['message'] as String? ?? r['code'] as String? ?? 'Screenshot failed');
-    // Return in the image content block format used throughout FlutterClaw
+    // Take screenshot and find elements in parallel
+    final results = await Future.wait([
+      _svc.screenshot(),
+      _svc.findElements(by: 'all'),
+    ]);
+    final r = results[0];
+    final elements = results[1];
+
+    // Build text summary of visible elements
+    final elemList = elements['elements'] as List<dynamic>? ?? [];
+    final summary = StringBuffer();
+    summary.writeln('=== Screen Elements (${elemList.length}) ===');
+    for (final e in elemList) {
+      if (e is! Map<String, dynamic>) continue;
+      final text = e['text'] as String?;
+      final desc = e['contentDescription'] as String?;
+      final cls = (e['className'] as String? ?? '').split('.').last;
+      final clickable = e['isClickable'] == true;
+      final cx = e['centerX'];
+      final cy = e['centerY'];
+      final label = text ?? desc ?? e['resourceId'] as String? ?? cls;
+      if (label.isEmpty) continue;
+      final tag = clickable ? '[clickable]' : '';
+      summary.writeln('- "$label" $tag at ($cx, $cy) [$cls]');
+    }
+
+    if (r['error'] == true) {
+      // Screenshot failed but we still have elements
+      return ToolResult.success(
+        'Screenshot failed: ${r['message'] ?? 'unknown error'}\n\n${summary.toString().trim()}',
+      );
+    }
+
+    // Return image block (for Anthropic/vision) + text summary (for all providers)
     final output = {
       'type': 'image',
       'data': r['data'],
-      'mimeType': r['mimeType'] ?? 'image/png',
-      if (r['note'] != null) 'note': r['note'],
+      'mimeType': r['mimeType'] ?? 'image/jpeg',
+      'note': summary.toString().trim(),
+      if (r['note'] != null) 'pixelCopyNote': r['note'],
     };
     return ToolResult.success(jsonEncode(output));
   }

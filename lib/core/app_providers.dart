@@ -456,14 +456,46 @@ final providerRouterProvider = Provider<ProviderRouter>((ref) {
   );
 });
 
+String _formatToolLabel(String name, Map<String, dynamic>? args) {
+  if (args == null || args.isEmpty) return name;
+  final raw =
+      args['path'] ?? args['query'] ?? args['url'] ?? args['key'] ??
+      args.values.whereType<String>().firstOrNull;
+  if (raw == null) return name;
+  final label = raw.toString();
+  final display = label.contains('/')
+      ? label.split('/').where((s) => s.isNotEmpty).last
+      : label;
+  final truncated = display.length > 40
+      ? '${display.substring(0, 40)}...'
+      : display;
+  return '$name: $truncated';
+}
+
 final agentLoopProvider = Provider<AgentLoop>((ref) {
   final skillsService = ref.read(skillsServiceProvider);
+  final notifService = ref.read(notificationServiceProvider);
+  final overlayService = ref.read(overlayServiceProvider);
+  final configManager = ref.watch(configManagerProvider);
+
   final loop = AgentLoop(
-    configManager: ref.watch(configManagerProvider),
+    configManager: configManager,
     providerRouter: ref.watch(providerRouterProvider),
     toolRegistry: ref.watch(toolRegistryProvider),
     sessionManager: ref.watch(sessionManagerProvider),
     skillsPromptGetter: () => skillsService.getSkillsPrompt(),
+    onToolStatus: (toolName, args, {bool isDone = false}) {
+      try {
+        if (isDone) {
+          overlayService.hide();
+          return;
+        }
+        final label = _formatToolLabel(toolName, args);
+        final agentName = configManager.config.activeAgent?.name ?? 'Agent';
+        overlayService.show(label);
+        notifService.showToolStatusNotification(agentName, label);
+      } catch (_) {}
+    },
   );
   // Bind the singleton proxy so sessions_spawn / subagents steer can call
   // the agent loop without a circular provider dependency.
@@ -1014,26 +1046,6 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
     }
   }
 
-  void _sendBackgroundToolNotification(String toolName, Map<String, dynamic>? toolArgs) {
-    try {
-      final label = _formatToolStatus(toolName, toolArgs);
-      final notifService = ref.read(notificationServiceProvider);
-      final configManager = ref.read(configManagerProvider);
-      final agentName = configManager.config.activeAgent?.name ?? 'Agent';
-      notifService.showToolStatusNotification(agentName, label);
-      // Also show floating overlay chip on top of all apps
-      ref.read(overlayServiceProvider).show(label);
-    } catch (_) {
-      // Non-fatal — notification failure must not break agent processing.
-    }
-  }
-
-  void _hideOverlay() {
-    try {
-      ref.read(overlayServiceProvider).hide();
-    } catch (_) {}
-  }
-
   void _sendBackgroundNotification(String responseText) {
     try {
       final notifService = ref.read(notificationServiceProvider);
@@ -1195,9 +1207,6 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
             ),
           );
           state = updated;
-          if (_isAppInBackground) {
-            _sendBackgroundToolNotification(event.toolName!, event.toolArgs);
-          }
         }
 
         if (event.textDelta != null) {
@@ -1210,7 +1219,6 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
         }
 
         if (event.isDone) {
-          _hideOverlay();
           final resp = event.finalResponse;
           final finalText = resp?.content ?? buffer.toString();
           final updated = List<ChatMessage>.from(state);
@@ -1228,7 +1236,6 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
         }
       }
     } catch (e) {
-      _hideOverlay();
       final updated = List<ChatMessage>.from(state);
       if (updated.isNotEmpty) {
         final errorMsg = _buildErrorMessage(e);
@@ -1577,9 +1584,6 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
             ),
           );
           state = updated;
-          if (_isAppInBackground) {
-            _sendBackgroundToolNotification(event.toolName!, event.toolArgs);
-          }
         }
 
         // Streaming tool output chunk — update the live result text on the pill.
@@ -1624,7 +1628,6 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
         }
 
         if (event.isDone) {
-          _hideOverlay();
           final resp = event.finalResponse;
           final finalText = resp?.content ?? buffer.toString();
           final updated = List<ChatMessage>.from(state);
@@ -1646,7 +1649,6 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
         flushBuffer();
       }
     } catch (e) {
-      _hideOverlay();
       final updated = List<ChatMessage>.from(state);
       updated[updated.length - 1] = updated.last.copyWith(
         text: _cancelled

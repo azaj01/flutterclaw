@@ -60,6 +60,15 @@ class AgentStreamEvent {
   });
 }
 
+/// Callback invoked by [AgentLoop] when a tool starts or finishes.
+/// [toolName] is the tool being called, [args] are its arguments.
+/// [isDone] is true when the tool has finished executing.
+typedef ToolStatusCallback = void Function(
+  String toolName,
+  Map<String, dynamic>? args, {
+  bool isDone,
+});
+
 class AgentLoop {
   final ConfigManager configManager;
   final ProviderRouter providerRouter;
@@ -67,12 +76,17 @@ class AgentLoop {
   final SessionManager sessionManager;
   String Function()? skillsPromptGetter;
 
+  /// Optional callback invoked for every tool call, regardless of caller
+  /// (ChatNotifier, channels, subagents). Use for overlay/notification.
+  ToolStatusCallback? onToolStatus;
+
   AgentLoop({
     required this.configManager,
     required this.providerRouter,
     required this.toolRegistry,
     required this.sessionManager,
     this.skillsPromptGetter,
+    this.onToolStatus,
   });
 
   // Android UI automation strategy injected into system prompt
@@ -247,7 +261,9 @@ Do NOT chain multiple actions without screenshots in between. The correct patter
 
           for (final tc in response.toolCalls!) {
             final args = _parseToolArgs(tc.function.arguments);
+            onToolStatus?.call(tc.function.name, args, isDone: false);
             final result = await toolRegistry.execute(tc.function.name, args);
+            onToolStatus?.call(tc.function.name, args, isDone: true);
             toolCallsExecuted++;
 
             // Persist tool result
@@ -507,6 +523,7 @@ Do NOT chain multiple actions without screenshots in between. The correct patter
 
           for (final tc in toolCallsBuffer) {
             final args = _parseToolArgs(tc.function.arguments);
+            onToolStatus?.call(tc.function.name, args, isDone: false);
             yield AgentStreamEvent(toolName: tc.function.name, toolArgs: args);
 
             // Use streaming execution when the tool supports it so incremental
@@ -530,6 +547,7 @@ Do NOT chain multiple actions without screenshots in between. The correct patter
               yield chunkEvent;
             }
             final result = await chunkFuture;
+            onToolStatus?.call(tc.function.name, args, isDone: true);
             toolCallsExecuted++;
             yield AgentStreamEvent(toolResult: result.content);
 

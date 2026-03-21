@@ -7,8 +7,11 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:logging/logging.dart';
 
 import 'provider_interface.dart';
+
+final _log = Logger('OpenAiProvider');
 
 /// OpenAI-compatible provider using /chat/completions endpoint.
 class OpenAiProvider implements LlmProvider {
@@ -213,17 +216,8 @@ class OpenAiProvider implements LlmProvider {
     // split: the tool message gets text-only content, and the image is injected
     // as a follow-up user message. This is necessary because OpenAI-compatible
     // APIs don't support content arrays in tool role messages.
-    final pendingImages = <Map<String, dynamic>>[];
     final messages = <Map<String, dynamic>>[];
-    final msgList = request.messages;
-    for (var i = 0; i < msgList.length; i++) {
-      final m = msgList[i];
-      // Collect images from tool results before conversion strips them
-      if (m.role == 'tool' && m.content is String && request.supportsVision) {
-        final img = _extractImageFromToolContent(m.content as String);
-        if (img != null) pendingImages.add(img);
-      }
-
+    for (final m in request.messages) {
       final converted = _messageToJson(
         m,
         apiBase: request.apiBase,
@@ -234,23 +228,6 @@ class OpenAiProvider implements LlmProvider {
         messages.add({'role': placeholderRole, 'content': '...'});
       }
       messages.add(converted);
-
-      // After all tool results for this turn, inject images as a user message.
-      // We detect the boundary: current message is 'tool' and next won't be 'tool'.
-      if (m.role == 'tool' && pendingImages.isNotEmpty) {
-        final nextIsTool =
-            i + 1 < msgList.length && msgList[i + 1].role == 'tool';
-        if (!nextIsTool) {
-          messages.add({
-            'role': 'user',
-            'content': [
-              {'type': 'text', 'text': 'Here is the screenshot from the tool call above:'},
-              ...pendingImages,
-            ],
-          });
-          pendingImages.clear();
-        }
-      }
     }
 
     final reasoning = _isReasoningModel(request.model);
@@ -300,8 +277,7 @@ class OpenAiProvider implements LlmProvider {
   /// OpenAI-compatible APIs require tool message `content` to be a **string**
   /// (content arrays are not supported for the tool role). When the tool result
   /// contains a JSON-encoded image block (from ui_screenshot), this returns a
-  /// text-only placeholder. The actual image is injected as a follow-up user
-  /// message by [_buildBody] so vision models can still see it.
+  /// text-only string with the element summary from the `note` field.
   String _convertToolContent(String content, {bool stripImages = false}) {
     if (content.contains('"type":"image"') ||
         content.contains('"type": "image"')) {
@@ -319,27 +295,6 @@ class OpenAiProvider implements LlmProvider {
     return content;
   }
 
-  /// Extracts image data from a JSON-encoded tool result content string.
-  /// Returns an OpenAI image_url content block if found, null otherwise.
-  Map<String, dynamic>? _extractImageFromToolContent(String content) {
-    if (!content.contains('"type":"image"') &&
-        !content.contains('"type": "image"')) return null;
-    try {
-      final parsed = jsonDecode(content);
-      if (parsed is Map<String, dynamic> &&
-          parsed['type'] == 'image' &&
-          parsed.containsKey('data') &&
-          parsed.containsKey('mimeType')) {
-        return {
-          'type': 'image_url',
-          'image_url': {
-            'url': 'data:${parsed['mimeType']};base64,${parsed['data']}',
-          },
-        };
-      }
-    } catch (_) {}
-    return null;
-  }
 
   /// Converts content to OpenAI format.
   /// Neutral image blocks `{type:"image", data, mimeType}` become
@@ -562,6 +517,8 @@ class OpenAiProvider implements LlmProvider {
     } else if (e.response?.data is String) {
       message = e.response!.data as String;
     }
+
+    _log.severe('API error $statusCode: $message');
 
     return LlmProviderException(
       message: message,
