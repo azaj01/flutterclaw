@@ -232,6 +232,48 @@ class AgentLoop {
       );
     }
 
+    // If the loop was cut off mid-task (last message is a tool result, meaning
+    // the LLM was still calling tools when the limit hit), make one final call
+    // without tools so the agent can summarize progress and prompt the user to
+    // continue rather than silently stopping.
+    if (loopMessages.isNotEmpty && loopMessages.last.role == 'tool') {
+      final limitMsg = LlmMessage(
+        role: 'user',
+        content: '[Tool call limit reached after $toolCallsExecuted calls. '
+            'Summarize what you accomplished, what still needs to be done, '
+            'and tell the user they can ask you to continue.]',
+      );
+      await sessionManager.addMessage(sessionKey, limitMsg);
+      loopMessages.add(limitMsg);
+      try {
+        final gracefulReq = LlmRequest(
+          model: modelEntry.model,
+          apiKey: configManager.config.resolveApiKey(modelEntry),
+          apiBase: configManager.config.resolveApiBase(modelEntry),
+          messages: loopMessages,
+          tools: null,
+          maxTokens: maxTokens,
+          temperature: temperature,
+          timeoutSeconds: modelEntry.requestTimeout,
+          supportsVision: modelEntry.supportsVision,
+        );
+        final gracefulResp = await providerRouter.chatCompletion(gracefulReq);
+        final gracefulContent = gracefulResp.content ?? '';
+        await sessionManager.addMessage(
+          sessionKey,
+          LlmMessage(role: 'assistant', content: gracefulContent),
+        );
+        return AgentResponse(
+          content: gracefulContent,
+          toolCallsExecuted: toolCallsExecuted,
+          usage: totalUsage,
+          sessionKey: sessionKey,
+        );
+      } catch (_) {
+        // Graceful call failed — fall through to return last known content
+      }
+    }
+
     final lastAssistant = loopMessages.lastWhere(
       (m) => m.role == 'assistant',
       orElse: () => const LlmMessage(role: 'assistant', content: ''),
@@ -450,6 +492,47 @@ class AgentLoop {
         ),
       );
       return;
+    }
+
+    // If the loop was cut off mid-task (last message is a tool result, meaning
+    // the LLM was still calling tools when the limit hit), stream one final call
+    // without tools so the agent can summarize progress and prompt the user to
+    // continue rather than silently stopping.
+    if (loopMessages.isNotEmpty && loopMessages.last.role == 'tool') {
+      final limitMsg = LlmMessage(
+        role: 'user',
+        content: '[Tool call limit reached after $toolCallsExecuted calls. '
+            'Summarize what you accomplished, what still needs to be done, '
+            'and tell the user they can ask you to continue.]',
+      );
+      await sessionManager.addMessage(sessionKey, limitMsg);
+      loopMessages.add(limitMsg);
+      try {
+        final gracefulReq = LlmRequest(
+          model: modelEntry.model,
+          apiKey: configManager.config.resolveApiKey(modelEntry),
+          apiBase: configManager.config.resolveApiBase(modelEntry),
+          messages: loopMessages,
+          tools: null,
+          maxTokens: maxTokens,
+          temperature: temperature,
+          timeoutSeconds: modelEntry.requestTimeout,
+          supportsVision: modelEntry.supportsVision,
+        );
+        contentBuffer = '';
+        await for (final event in providerRouter.chatCompletionStream(gracefulReq)) {
+          if (event.contentDelta != null) {
+            contentBuffer += event.contentDelta!;
+            yield AgentStreamEvent(textDelta: event.contentDelta);
+          }
+        }
+        await sessionManager.addMessage(
+          sessionKey,
+          LlmMessage(role: 'assistant', content: contentBuffer),
+        );
+      } catch (_) {
+        // Graceful stream failed — fall through to emit isDone with last buffer
+      }
     }
 
     yield AgentStreamEvent(
