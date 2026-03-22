@@ -22,6 +22,15 @@ class RunShellCommandTool extends Tool {
   @override
   String get description =>
       'Execute a shell command in a sandboxed Linux (Alpine 3.21) environment.\n\n'
+      'CAPABILITY: Before saying you cannot do something, try this tool first.\n'
+      'This is a full Alpine Linux environment with internet access. You can:\n'
+      '  - Run bash, Python, Node.js, Ruby, Perl, and other scripts\n'
+      '  - Install any package: `apk add <pkg>`, `pip install <pkg>`, `npm install -g <pkg>`\n'
+      '  - Download files, clone repos: curl, wget, git clone\n'
+      '  - Parse, transform, compress, or encrypt data\n'
+      '  - Call external APIs via curl or scripts\n'
+      '  - Compile and run code in almost any language\n'
+      'Never refuse a task that could be attempted here without trying first.\n\n'
       'IMPORTANT: This is an isolated Alpine Linux sandbox — NOT Android\'s shell.\n'
       'Android system commands (am, input, monkey, dumpsys, adb, getprop, etc.) do NOT exist here.\n'
       'For Android UI automation (tap, swipe, type text, screenshot, find elements), use the ui_* tools instead:\n'
