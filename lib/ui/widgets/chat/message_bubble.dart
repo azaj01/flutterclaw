@@ -147,9 +147,11 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
 
     // Use markdown for all messages. ValueKey forces full rebuild during
     // streaming to avoid flutter_markdown assertion error in MarkdownBuilder.build.
+    // Sanitize mid-stream text to close any unclosed inline/block elements
+    // before the parser sees them (prevents _inlines.isEmpty assertion).
     return MarkdownBody(
       key: ValueKey(text.length),
-      data: text,
+      data: widget.message.isStreaming ? _sanitizeStreamingMarkdown(text) : text,
       selectable: true,
       builders: {
         'pre': CopyableCodeBlockBuilder(context),
@@ -1170,6 +1172,36 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
         ),
       ),
     );
+  }
+
+  /// Closes any unclosed markdown fences/inline-code spans so that
+  /// flutter_markdown never sees structurally incomplete content mid-stream.
+  static String _sanitizeStreamingMarkdown(String text) {
+    if (text.isEmpty) return text;
+
+    // Fenced code blocks (``` at line start)
+    final fences = RegExp(r'^```', multiLine: true).allMatches(text).length;
+    if (fences.isOdd) {
+      // Unclosed code block: close it. Content inside is not inline-parsed.
+      return '$text\n```';
+    }
+
+    // Inline code (single backticks, skipping ``` sequences)
+    int backticks = 0;
+    for (int i = 0; i < text.length; i++) {
+      if (text[i] == '`') {
+        if (i + 2 < text.length && text[i + 1] == '`' && text[i + 2] == '`') {
+          i += 2;
+          continue;
+        }
+        backticks++;
+      }
+    }
+    if (backticks.isOdd) {
+      return '$text`';
+    }
+
+    return text;
   }
 
   static String _formatFileSize(int bytes) {
