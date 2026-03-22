@@ -74,7 +74,7 @@ class ModelCatalog {
     CatalogProvider(
       id: 'xai',
       displayName: 'xAI',
-      description: 'Grok-3 and Grok-4-fast.',
+      description: 'Grok 4 and Grok 4 Fast — multimodal chat (docs.x.ai).',
       icon: Icons.bolt,
       signupUrl: 'https://console.x.ai/',
       apiBase: 'https://api.x.ai/v1',
@@ -93,7 +93,7 @@ class ModelCatalog {
     CatalogProvider(
       id: 'deepseek',
       displayName: 'DeepSeek',
-      description: 'DeepSeek-V3 and R1 — excellent reasoning at low cost.',
+      description: 'DeepSeek-V3.2 (chat + reasoner) — 128K context (api-docs.deepseek.com).',
       icon: Icons.explore,
       signupUrl: 'https://platform.deepseek.com/api_keys',
       apiBase: 'https://api.deepseek.com/v1',
@@ -101,11 +101,11 @@ class ModelCatalog {
     CatalogProvider(
       id: 'groq',
       displayName: 'Groq',
-      description: 'Groq.com — ultra-fast inference for Llama, Mixtral. Not related to xAI Grok.',
+      description:
+          'GroqCloud — fast Llama inference. Model IDs: console.groq.com/docs/models. Not xAI Grok.',
       icon: Icons.flash_on,
       signupUrl: 'https://console.groq.com/keys',
       apiBase: 'https://api.groq.com/openai/v1',
-      hasFreeModels: true,
     ),
     CatalogProvider(
       id: 'ollama',
@@ -218,20 +218,21 @@ class ModelCatalog {
       input: ['text', 'image'],
     ),
     CatalogModel(
-      id: 'claude-sonnet-4-6-20260301',
+      id: 'claude-sonnet-4-6',
       displayName: 'Claude Sonnet 4.6',
       providerId: 'anthropic',
       isFree: false,
       contextWindow: 1000000,
-      description: 'Latest Sonnet — 1M context, balanced',
+      description: 'Latest Sonnet — 1M context, balanced (Claude API ID per Anthropic docs)',
       input: ['text', 'image'],
     ),
     CatalogModel(
-      id: 'claude-opus-4-6-20260301',
+      id: 'claude-opus-4-6',
       displayName: 'Claude Opus 4.6',
       providerId: 'anthropic',
       isFree: false,
-      contextWindow: 200000,
+      contextWindow: 1000000,
+      description: 'Most capable Claude — 1M context (Claude API ID per Anthropic docs)',
       input: ['text', 'image'],
     ),
 
@@ -287,11 +288,11 @@ class ModelCatalog {
     // DeepSeek (OpenAI-compatible)
     CatalogModel(
       id: 'deepseek-chat',
-      displayName: 'DeepSeek-V3',
+      displayName: 'DeepSeek-V3.2',
       providerId: 'deepseek',
       isFree: false,
       contextWindow: 128000,
-      description: 'Flagship chat model',
+      description: 'Flagship chat (DeepSeek-V3.2 non-thinking, api-docs.deepseek.com)',
       input: ['text'],
     ),
     CatalogModel(
@@ -300,36 +301,36 @@ class ModelCatalog {
       providerId: 'deepseek',
       isFree: false,
       contextWindow: 128000,
-      description: 'Chain-of-thought reasoning',
+      description: 'Thinking mode (DeepSeek-V3.2, api-docs.deepseek.com)',
       input: ['text'],
     ),
 
-    // Groq (OpenAI-compatible, ultra-fast)
+    // Groq (OpenAI-compatible, ultra-fast) — model IDs: console.groq.com/docs/models
     CatalogModel(
       id: 'llama-3.3-70b-versatile',
       displayName: 'Llama 3.3 70B',
       providerId: 'groq',
-      isFree: true,
-      contextWindow: 128000,
-      description: 'Meta Llama — free, very fast',
+      isFree: false,
+      contextWindow: 131072,
+      description: 'Meta Llama — production (Groq production table)',
       input: ['text'],
     ),
     CatalogModel(
       id: 'llama-3.1-8b-instant',
       displayName: 'Llama 3.1 8B (instant)',
       providerId: 'groq',
-      isFree: true,
-      contextWindow: 128000,
-      description: 'Smallest Llama — near-instant',
+      isFree: false,
+      contextWindow: 131072,
+      description: 'Meta Llama — smaller & faster production tier (Groq docs)',
       input: ['text'],
     ),
     CatalogModel(
-      id: 'moonshotai/kimi-k2-instruct',
+      id: 'moonshotai/kimi-k2',
       displayName: 'Kimi K2',
       providerId: 'openrouter',
       isFree: false,
       contextWindow: 131072,
-      description: 'MoonshotAI agentic model',
+      description: 'MoonshotAI — OpenRouter id moonshotai/kimi-k2',
       input: ['text'],
     ),
     CatalogModel(

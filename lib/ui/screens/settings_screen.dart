@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutterclaw/core/app_providers.dart';
+import 'package:flutterclaw/core/package_info_provider.dart';
 import 'package:flutterclaw/l10n/l10n_extension.dart';
 import 'package:flutterclaw/ui/screens/settings/about_screen.dart';
 import 'package:flutterclaw/ui/screens/settings/gateway_screen.dart';
@@ -22,10 +23,10 @@ class SettingsScreen extends ConsumerWidget {
         children: [
           _SettingsTile(
             icon: Icons.hub_outlined,
-            title: 'Providers & Models',
+            title: context.l10n.providersAndModels,
             subtitle: hasModels
-                ? '${config.modelList.length} model${config.modelList.length == 1 ? '' : 's'} configured'
-                : 'No models configured',
+                ? context.l10n.modelsConfiguredCount(config.modelList.length)
+                : context.l10n.noModelsConfigured,
             subtitleColor: hasModels ? null : colors.error,
             onTap: () => Navigator.push(
               context,
@@ -37,8 +38,8 @@ class SettingsScreen extends ConsumerWidget {
             icon: Icons.router_outlined,
             title: context.l10n.gateway,
             subtitle: config.gateway.autoStart
-                ? 'Auto-start enabled'
-                : 'Auto-start off',
+                ? context.l10n.autoStartEnabledLabel
+                : context.l10n.autoStartOffLabel,
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const GatewayScreen()),
@@ -46,10 +47,10 @@ class SettingsScreen extends ConsumerWidget {
           ),
           _SettingsTile(
             icon: Icons.shield_outlined,
-            title: 'Tool Policies',
+            title: context.l10n.toolPolicies,
             subtitle: config.tools.disabled.isEmpty
-                ? 'All tools enabled'
-                : '${config.tools.disabled.length} tool${config.tools.disabled.length == 1 ? '' : 's'} disabled',
+                ? context.l10n.allToolsEnabled
+                : context.l10n.toolsDisabledCount(config.tools.disabled.length),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(
@@ -59,7 +60,15 @@ class SettingsScreen extends ConsumerWidget {
           _SettingsTile(
             icon: Icons.info_outline,
             title: context.l10n.about,
-            subtitle: 'FlutterClaw v0.1.0',
+            subtitle: ref.watch(packageInfoProvider).when(
+                  data: (info) => context.l10n.appVersionSubtitle(
+                        context.l10n.appTitle,
+                        info.version,
+                        info.buildNumber,
+                      ),
+                  loading: () => context.l10n.appTitle,
+                  error: (_, _) => context.l10n.appTitle,
+                ),
             onTap: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const AboutScreen()),

@@ -89,12 +89,20 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       );
 
       // Model entry no longer needs apiKey — resolved from providerCredentials
+      CatalogModel? catalogModel;
+      for (final m in ModelCatalog.models) {
+        if (m.id == _authResult!.modelId) {
+          catalogModel = m;
+          break;
+        }
+      }
       final modelEntry = ModelEntry(
         modelName: _authResult!.modelDisplayName,
         model: _authResult!.modelId,
         apiBase: _authResult!.apiBase ?? provider?.apiBase,
         provider: _selectedProviderId!,
         isFree: _authResult!.isFree,
+        input: catalogModel?.input,
       );
 
       // Update any existing agent profiles to use the new model.
@@ -262,10 +270,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                   else
                     const Center(child: Text('Select a provider first')),
 
-                  // 3 (Android only): Accessibility Service permission
+                  // 3 (Android only): Accessibility Service + Overlay permissions
                   if (Platform.isAndroid)
                     AccessibilityPage(
                       service: ref.read(uiAutomationServiceProvider),
+                      overlayService: ref.read(overlayServiceProvider),
                       onContinue: _nextPage,
                       onSkip: _nextPage,
                     ),
