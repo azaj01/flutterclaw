@@ -9,6 +9,7 @@ library;
 
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutterclaw/services/sandbox_service.dart';
 import 'package:flutterclaw/tools/registry.dart';
 
@@ -85,24 +86,92 @@ class RunShellCommandTool extends Tool {
 
   @override
   Stream<String>? executeStream(Map<String, dynamic> args) async* {
-    // TODO: Implement real line-by-line streaming of stdout/stderr.
-    // Currently this is a pseudo-stream: shows "Running..." then waits for
-    // the entire command to complete. Real streaming would require:
-    // - Android: EventChannel in SandboxHandler.kt to emit stdout lines
-    // - iOS: EventChannel in WasmSandboxHandler.swift
-    // - Dart: SandboxService.exec() returning Stream<String> instead of Future
-    //
-    // For now, yield a "running" notice immediately so the tool card shows activity,
-    // then yield the full output once the command completes.
-    yield '⏳ Running…\n';
-    final result = await execute(args);
-    if (!result.isError) {
-      // Replace the placeholder with the real output.
-      yield '\x00CLEAR\x00${result.content}';
-    } else {
-      yield '\x00CLEAR\x00Error: ${result.content}';
+    final command = args['command'] as String?;
+    if (command == null || command.isEmpty) {
+      yield '\x00CLEAR\x00${jsonEncode({"exit_code": 1, "stdout": "", "stderr": "Error: command is required", "timed_out": false})}';
+      return;
     }
+
+    final timeoutMs = (args['timeout_ms'] as num?)?.toInt() ?? 30000;
+    if (timeoutMs < 1000 || timeoutMs > 120000) {
+      yield '\x00CLEAR\x00${jsonEncode({"exit_code": 1, "stdout": "", "stderr": "Error: timeout_ms must be between 1000 and 120000", "timed_out": false})}';
+      return;
+    }
+
+    final workingDir = args['working_dir'] as String?;
+
+    // Check sandbox availability and auto-provision.
+    final status = await _svc.status();
+    if (status['error'] == true) {
+      yield '\x00CLEAR\x00${jsonEncode({"exit_code": 1, "stdout": "", "stderr": status['message'] ?? 'Status check failed', "timed_out": false})}';
+      return;
+    }
+    if (status['ready'] != true) {
+      yield 'Setting up sandbox...\n';
+      final setup = await _svc.setup();
+      if (setup['error'] == true) {
+        yield '\x00CLEAR\x00${jsonEncode({"exit_code": 1, "stdout": "", "stderr": "Sandbox setup failed: ${setup['message'] ?? 'unknown error'}", "timed_out": false})}';
+        return;
+      }
+    }
+
+    // Stream execution output via EventChannel
+    final stdoutBuf = StringBuffer(); // ANSI-stripped — for LLM context
+    final stderrBuf = StringBuffer(); // ANSI-stripped — for LLM context
+    int exitCode = 0;
+    bool timedOut = false;
+    int chunkCount = 0;
+
+    debugPrint('[SandboxTool] execStream starting for: $command');
+    await for (final event in _svc.execStream(
+      command: command,
+      timeoutMs: timeoutMs,
+      workingDir: workingDir,
+    )) {
+      final type = event['type'] as String?;
+      debugPrint('[SandboxTool] event type=$type, keys=${event.keys.toList()}');
+      if (type == 'stdout') {
+        final data = event['data'] as String? ?? '';
+        chunkCount++;
+        debugPrint('[SandboxTool] stdout chunk #$chunkCount len=${data.length}');
+        stdoutBuf.write(_stripAnsi(data)); // Strip ANSI for LLM
+        yield data; // Raw (with ANSI) → xterm renders it natively
+      } else if (type == 'stderr') {
+        final data = event['data'] as String? ?? '';
+        chunkCount++;
+        debugPrint('[SandboxTool] stderr chunk #$chunkCount len=${data.length}');
+        stderrBuf.write(_stripAnsi(data));
+        yield data;
+      } else if (type == 'exit') {
+        exitCode = (event['exit_code'] as int?) ?? 0;
+        timedOut = event['timed_out'] == true;
+        debugPrint('[SandboxTool] exit code=$exitCode timedOut=$timedOut');
+      }
+    }
+
+    debugPrint('[SandboxTool] stream done, $chunkCount chunks, stdout=${stdoutBuf.length} stderr=${stderrBuf.length}');
+    // Final authoritative JSON (replaces accumulated text for the LLM)
+    yield '\x00CLEAR\x00${jsonEncode({
+      "exit_code": exitCode,
+      "stdout": stdoutBuf.toString(),
+      "stderr": stderrBuf.toString(),
+      "timed_out": timedOut,
+    })}';
   }
+
+  // Strips ANSI escape sequences and TinyEMU/ash prompt lines so the LLM
+  // receives clean plain text. The xterm widget gets the raw output via yield.
+  static final _ansiRe = RegExp(
+    r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~]|\][^\x07]*\x07)',
+  );
+  // TinyEMU ash prompt pattern: "~ # " or "/path # " (no spaces in path).
+  static final _promptRe = RegExp(r'^[~/][^ ]*? # .*', multiLine: true);
+  static String _stripAnsi(String s) => s
+      .replaceAll(_ansiRe, '')
+      .replaceAll(_promptRe, '')
+      .replaceAll('\r', '')
+      .replaceAll(RegExp(r'\n{3,}'), '\n\n')
+      .trim();
 
   @override
   Future<ToolResult> execute(Map<String, dynamic> args) async {

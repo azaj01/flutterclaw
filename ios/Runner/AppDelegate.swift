@@ -103,11 +103,23 @@ import UserNotifications
   // MARK: - Sandbox Shell (iOS: TinyEMU RISC-V + Alpine 3.21 via WAMR)
 
   private var sandboxHandler: WasmSandboxHandler?
+  // Keep streamChannel alive — if it were a local var it would be deallocated
+  // after setupSandboxChannel returns, deregistering the EventChannel handler.
+  private var sandboxStreamChannel: FlutterEventChannel?
 
   private func setupSandboxChannel(_ engineBridge: FlutterImplicitEngineBridge) {
     guard let messenger = engineBridge.pluginRegistry
-      .registrar(forPlugin: "Sandbox")?.messenger() else { return }
+      .registrar(forPlugin: "Sandbox")?.messenger() else {
+      print("[AppDelegate] setupSandboxChannel: messenger unavailable, sandbox disabled")
+      return
+    }
     sandboxHandler = WasmSandboxHandler(messenger: messenger)
+    sandboxStreamChannel = FlutterEventChannel(
+      name: "ai.flutterclaw/sandbox_stream",
+      binaryMessenger: messenger
+    )
+    sandboxStreamChannel!.setStreamHandler(sandboxHandler)
+    print("[AppDelegate] sandbox EventChannel registered")
   }
 
   private func configureAudioSession() {

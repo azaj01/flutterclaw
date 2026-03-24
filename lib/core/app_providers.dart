@@ -995,6 +995,24 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
     }
   }
 
+  /// Kill the currently running sandbox process and mark the tool pill as done.
+  Future<void> killCurrentProcess() async {
+    final svc = ref.read(sandboxServiceProvider);
+    await svc.kill();
+    final updated = List<ChatMessage>.from(state);
+    for (var i = updated.length - 1; i >= 0; i--) {
+      if (updated[i].isToolStatus && updated[i].isStreaming == true) {
+        final existing = updated[i].toolResultText ?? '';
+        updated[i] = updated[i].copyWith(
+          isStreaming: false,
+          toolResultText: existing.isEmpty ? '(process killed)' : existing,
+        );
+        break;
+      }
+    }
+    state = updated;
+  }
+
   /// Returns the session key currently being viewed in the chat screen.
   String _getSessionKey() => ref.read(activeSessionKeyProvider);
 
@@ -1673,27 +1691,37 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
         // Streaming tool output chunk — update the live result text on the pill.
         if (event.toolResultChunk != null) {
           final chunk = event.toolResultChunk!;
+          final isClear = chunk.startsWith('\x00CLEAR\x00');
+          print('[ChatNotifier] toolResultChunk len=${chunk.length} isClear=$isClear');
           final updated = List<ChatMessage>.from(state);
+          bool found = false;
           for (var i = updated.length - 1; i >= 0; i--) {
             if (updated[i].isToolStatus && updated[i].isStreaming == true) {
+              found = true;
               final String newText;
-              if (chunk.startsWith('\x00CLEAR\x00')) {
+              if (isClear) {
                 // Replace accumulated text with the final authoritative output.
-                newText = chunk.substring(8);
+                newText = chunk.substring(7); // \x00CLEAR\x00 is 7 chars
               } else {
                 newText = (updated[i].toolResultText ?? '') + chunk;
               }
+              print('[ChatNotifier] → updating pill at i=$i, newText len=${newText.length}');
               updated[i] = updated[i].copyWith(toolResultText: newText);
               break;
             }
           }
+          if (!found) print('[ChatNotifier] ⚠ no streaming pill found for chunk!');
           state = updated;
         }
 
         if (event.toolResult != null) {
+          print('[ChatNotifier] toolResult len=${event.toolResult!.length}');
           final updated = List<ChatMessage>.from(state);
+          bool found = false;
           for (var i = updated.length - 1; i >= 0; i--) {
             if (updated[i].isToolStatus && updated[i].isStreaming == true) {
+              found = true;
+              print('[ChatNotifier] → marking pill at i=$i as done');
               updated[i] = updated[i].copyWith(
                 isStreaming: false,
                 toolResultText: event.toolResult,
@@ -1701,6 +1729,7 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
               break;
             }
           }
+          if (!found) print('[ChatNotifier] ⚠ no streaming pill found for toolResult!');
           state = updated;
         }
 

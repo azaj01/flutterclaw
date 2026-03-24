@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.BufferedReader
@@ -30,7 +31,7 @@ import java.util.zip.GZIPInputStream
  * internal storage using a pure-Kotlin tar.gz extractor (Android does not
  * ship a `tar` binary).
  */
-class SandboxHandler(private val context: Context) {
+class SandboxHandler(private val context: Context) : EventChannel.StreamHandler {
 
     companion object {
         private const val TAG = "SandboxHandler"
@@ -61,11 +62,42 @@ class SandboxHandler(private val context: Context) {
     private val executor = Executors.newCachedThreadPool()
     private val activeProcesses = CopyOnWriteArrayList<Process>()
 
+    // Active PTY master fd for stdin writes (set during PTY-based streaming, -1 otherwise).
+    @Volatile
+    private var activePtyMasterFd: Int = -1
+
+    // ─── EventChannel StreamHandler ──────────────────────────────────────────────
+
+    @Volatile
+    private var eventSink: EventChannel.EventSink? = null
+
+    override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+        eventSink = events
+        // Command args are passed via receiveBroadcastStream(args) from Dart.
+        // Start streaming execution now that the sink is guaranteed to be set.
+        if (arguments is Map<*, *>) {
+            val command = arguments["command"] as? String ?: return
+            val timeoutMs = (arguments["timeout_ms"] as? Number)?.toLong() ?: 30000
+            val workingDir = arguments["working_dir"] as? String ?: "/root"
+            startStreamingExec(command, timeoutMs, workingDir)
+        }
+    }
+
+    override fun onCancel(arguments: Any?) {
+        // Kill active processes when the Dart side cancels the stream
+        for (p in activeProcesses) {
+            p.destroyForcibly()
+        }
+        eventSink = null
+    }
+
     fun handleMethodCall(call: MethodCall, result: MethodChannel.Result) {
         when (call.method) {
             "sandbox_status" -> handleStatus(result)
             "sandbox_setup" -> handleSetup(result)
             "sandbox_exec" -> handleExec(call, result)
+            "sandbox_kill" -> handleKill(result)
+            "sandbox_write_stdin" -> handleWriteStdin(call, result)
             else -> result.notImplemented()
         }
     }
@@ -274,6 +306,248 @@ class SandboxHandler(private val context: Context) {
                 postSuccess(result, mapOf("error" to true, "message" to (e.message ?: "Execution failed")))
             }
         }
+    }
+
+    // ─── Streaming Exec ────────────────────────────────────────────────────────────
+
+    /**
+     * Streaming exec triggered from EventChannel.onListen.
+     * Tries PTY first (enables TUI apps: htop, top, vim, etc.).
+     * Falls back to plain pipes if PTY allocation fails.
+     */
+    private fun startStreamingExec(command: String, timeoutMs: Long, workingDir: String) {
+        executor.execute {
+            val ptyFds = try { PtyHelper.openPty(cols = 220, rows = 50) } catch (_: Exception) { null }
+            if (ptyFds != null) {
+                execWithPty(command, timeoutMs, workingDir, masterFd = ptyFds[0], slaveFd = ptyFds[1])
+            } else {
+                Log.w(TAG, "PTY allocation failed, falling back to pipes")
+                execWithPipes(command, timeoutMs, workingDir)
+            }
+        }
+    }
+
+    /**
+     * PTY-based streaming exec. The subprocess receives a real terminal (isatty() == true),
+     * so TUI apps (htop, top, vim, nano, etc.) work correctly and ANSI colours are preserved.
+     * All output (stdout + stderr) comes through the PTY master.
+     */
+    private fun execWithPty(command: String, timeoutMs: Long, workingDir: String, masterFd: Int, slaveFd: Int) {
+        try {
+            val cmd = mutableListOf(
+                prootBin.absolutePath,
+                "-0",
+                "-r", rootfsDir.absolutePath,
+                "-b", "/dev",
+                "-b", "/proc",
+                "-b", "/sys",
+                "-w", workingDir,
+                "/bin/sh", "-c", command,
+            )
+
+            val pb = ProcessBuilder(cmd)
+            pb.environment()["HOME"] = "/root"
+            pb.environment()["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+            pb.environment()["TERM"] = "xterm-256color"
+            pb.environment()["COLUMNS"] = "220"
+            pb.environment()["LINES"] = "50"
+            pb.environment()["PROOT_TMP_DIR"] = sandboxDir.absolutePath
+            pb.environment()["PROOT_LOADER"] = loaderBin.absolutePath
+
+            // Redirect stdin/stdout/stderr to the PTY slave.
+            // /proc/self/fd/<n> is a symlink to the open fd — works reliably on Android.
+            val slaveFile = File("/proc/self/fd/$slaveFd")
+            pb.redirectInput(slaveFile)
+            pb.redirectOutput(slaveFile)
+            pb.redirectError(slaveFile)
+
+            val process = pb.start()
+            activeProcesses.add(process)
+            activePtyMasterFd = masterFd
+
+            // Close the slave end in the parent — the child process has its own copy.
+            PtyHelper.closeFd(slaveFd)
+
+            val sink = eventSink
+            val buf = ByteArray(4096)
+
+            // Single reader thread: PTY master merges stdout + stderr with ANSI intact.
+            val readerThread = Thread {
+                try {
+                    var n: Int
+                    while (PtyHelper.readPty(masterFd, buf).also { n = it } > 0) {
+                        val text = String(buf, 0, n, Charsets.UTF_8)
+                        mainHandler.post {
+                            sink?.success(mapOf("type" to "stdout", "data" to text))
+                        }
+                    }
+                } catch (_: Exception) { }
+            }.apply { isDaemon = true; start() }
+
+            val finished = process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
+            if (!finished) {
+                process.destroyForcibly()
+                process.waitFor(5, TimeUnit.SECONDS)
+            }
+
+            // Closing masterFd signals EIO to the reader thread → it terminates.
+            activePtyMasterFd = -1
+            PtyHelper.closeFd(masterFd)
+            readerThread.join(3000)
+
+            activeProcesses.remove(process)
+
+            val exitCode = if (finished) process.exitValue() else -1
+            mainHandler.post {
+                sink?.success(mapOf(
+                    "type" to "exit",
+                    "exit_code" to exitCode,
+                    "timed_out" to !finished,
+                ))
+                sink?.endOfStream()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "execWithPty failed", e)
+            PtyHelper.closeFd(masterFd)
+            PtyHelper.closeFd(slaveFd)
+            // Attempt pipe fallback so the user still gets a result.
+            execWithPipes(command, timeoutMs, workingDir)
+        }
+    }
+
+    /**
+     * Pipe-based streaming exec fallback (used when PTY allocation fails).
+     * stdout and stderr are captured on separate threads and emitted independently.
+     */
+    private fun execWithPipes(command: String, timeoutMs: Long, workingDir: String) {
+        try {
+            val cmd = mutableListOf(
+                prootBin.absolutePath,
+                "-0",
+                "-r", rootfsDir.absolutePath,
+                "-b", "/dev",
+                "-b", "/proc",
+                "-b", "/sys",
+                "-w", workingDir,
+                "/bin/sh", "-c", command,
+            )
+
+            val pb = ProcessBuilder(cmd)
+            pb.environment()["HOME"] = "/root"
+            pb.environment()["PATH"] = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+            pb.environment()["TERM"] = "xterm-256color"
+            pb.environment()["PROOT_TMP_DIR"] = sandboxDir.absolutePath
+            pb.environment()["PROOT_LOADER"] = loaderBin.absolutePath
+            pb.redirectErrorStream(false)
+
+            val process = pb.start()
+            activeProcesses.add(process)
+
+            val sink = eventSink
+
+            val stdoutThread = Thread {
+                try {
+                    val reader = BufferedReader(InputStreamReader(process.inputStream))
+                    val buf = CharArray(4096)
+                    var read: Int
+                    while (reader.read(buf).also { read = it } != -1) {
+                        val text = String(buf, 0, read)
+                        mainHandler.post { sink?.success(mapOf("type" to "stdout", "data" to text)) }
+                    }
+                } catch (_: Exception) { }
+            }.apply { isDaemon = true; start() }
+
+            val stderrThread = Thread {
+                try {
+                    val reader = BufferedReader(InputStreamReader(process.errorStream))
+                    val buf = CharArray(4096)
+                    var read: Int
+                    while (reader.read(buf).also { read = it } != -1) {
+                        val text = String(buf, 0, read)
+                        mainHandler.post { sink?.success(mapOf("type" to "stderr", "data" to text)) }
+                    }
+                } catch (_: Exception) { }
+            }.apply { isDaemon = true; start() }
+
+            val finished = process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
+            if (!finished) {
+                process.destroyForcibly()
+                process.waitFor(5, TimeUnit.SECONDS)
+            }
+
+            try { process.inputStream.close() } catch (_: Exception) {}
+            try { process.errorStream.close() } catch (_: Exception) {}
+            try { process.outputStream.close() } catch (_: Exception) {}
+
+            stdoutThread.join(3000)
+            stderrThread.join(3000)
+
+            activeProcesses.remove(process)
+
+            val exitCode = if (finished) process.exitValue() else -1
+            mainHandler.post {
+                sink?.success(mapOf(
+                    "type" to "exit",
+                    "exit_code" to exitCode,
+                    "timed_out" to !finished,
+                ))
+                sink?.endOfStream()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "execWithPipes failed", e)
+            mainHandler.post {
+                eventSink?.success(mapOf(
+                    "type" to "exit",
+                    "exit_code" to -1,
+                    "timed_out" to false,
+                    "error" to (e.message ?: "Execution failed"),
+                ))
+                eventSink?.endOfStream()
+            }
+        }
+    }
+
+    // ─── Write Stdin ──────────────────────────────────────────────────────────────
+
+    private fun handleWriteStdin(call: MethodCall, result: MethodChannel.Result) {
+        val data = call.argument<String>("data")
+        if (data.isNullOrEmpty()) {
+            result.success(mapOf("error" to true, "message" to "data is required"))
+            return
+        }
+        val bytes = data.toByteArray(Charsets.UTF_8)
+        try {
+            val ptyFd = activePtyMasterFd
+            if (ptyFd >= 0) {
+                // PTY mode: write to PTY master fd
+                PtyHelper.writePty(ptyFd, bytes, bytes.size)
+                result.success(mapOf("written" to bytes.size))
+            } else {
+                // Pipe mode: write to process stdin
+                val process = activeProcesses.lastOrNull()
+                if (process == null) {
+                    result.success(mapOf("error" to true, "message" to "No active process"))
+                    return
+                }
+                process.outputStream.write(bytes)
+                process.outputStream.flush()
+                result.success(mapOf("written" to bytes.size))
+            }
+        } catch (e: Exception) {
+            result.success(mapOf("error" to true, "message" to "Write failed: ${e.message}"))
+        }
+    }
+
+    // ─── Kill ─────────────────────────────────────────────────────────────────────
+
+    private fun handleKill(result: MethodChannel.Result) {
+        var killed = 0
+        for (p in activeProcesses) {
+            p.destroyForcibly()
+            killed++
+        }
+        activeProcesses.clear()
+        result.success(mapOf("killed" to true, "count" to killed))
     }
 
     // ─── Tar.gz extraction (pure Kotlin, no system `tar` needed) ─────────────────

@@ -168,7 +168,7 @@ class ToolRegistry {
           // Used by tools that first yield progress indicators and then yield
           // the authoritative final content (e.g. sandbox_exec).
           if (chunk.startsWith('\x00CLEAR\x00')) {
-            resultContent = chunk.substring(8); // skip the 8-char sentinel
+            resultContent = chunk.substring(7); // skip the 7-char sentinel (\x00CLEAR\x00)
             onChunk(chunk); // pass through so UI can handle the clear
           } else {
             resultContent += chunk;

@@ -15,6 +15,7 @@ import android.accessibilityservice.AccessibilityServiceInfo
 import com.pravera.flutter_foreground_task.FlutterForegroundTaskPlugin
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import java.io.ByteArrayOutputStream
@@ -68,6 +69,8 @@ class MainActivity : FlutterActivity() {
             .setMethodCallHandler { call, result ->
                 sandboxHandler?.handleMethodCall(call, result) ?: result.notImplemented()
             }
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, "ai.flutterclaw/sandbox_stream")
+            .setStreamHandler(sandboxHandler)
 
         // Overlay status chip (floating on top of all apps) — singleton so the
         // background-service engine shares the same instance.

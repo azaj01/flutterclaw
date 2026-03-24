@@ -946,7 +946,7 @@ class _AddModelScreenState extends ConsumerState<_AddModelScreen> {
                 decoration: InputDecoration(
                   labelText: context.l10n.modelId,
                   border: const OutlineInputBorder(),
-                  hintText: 'e.g. google/gemini-2.5-flash',
+                  hintText: 'e.g. google/gemini-3-flash-preview',
                 ),
                 onChanged: (val) => setState(() =>
                     _selectedModelId =

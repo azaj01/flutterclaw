@@ -137,25 +137,40 @@ class ToolCall {
   final String type; // always "function"
   final ToolCallFunction function;
 
+  /// Provider-specific fields that must be round-tripped (e.g. Gemini's
+  /// `thought_signature` for thinking models).
+  final Map<String, dynamic>? extras;
+
   const ToolCall({
     required this.id,
     this.type = 'function',
     required this.function,
+    this.extras,
   });
 
   Map<String, dynamic> toJson() => {
+    if (extras != null) ...extras!,
     'id': id,
     'type': type,
     'function': function.toJson(),
   };
 
-  factory ToolCall.fromJson(Map<String, dynamic> json) => ToolCall(
-    id: json['id'] as String,
-    type: json['type'] as String? ?? 'function',
-    function: ToolCallFunction.fromJson(
-      json['function'] as Map<String, dynamic>,
-    ),
-  );
+  static const _knownKeys = {'id', 'type', 'function', 'index'};
+
+  factory ToolCall.fromJson(Map<String, dynamic> json) {
+    final extra = <String, dynamic>{};
+    for (final key in json.keys) {
+      if (!_knownKeys.contains(key)) extra[key] = json[key];
+    }
+    return ToolCall(
+      id: json['id'] as String,
+      type: json['type'] as String? ?? 'function',
+      function: ToolCallFunction.fromJson(
+        json['function'] as Map<String, dynamic>,
+      ),
+      extras: extra.isEmpty ? null : extra,
+    );
+  }
 }
 
 /// Function details within a tool call.

@@ -294,6 +294,12 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                                       ),
                                     );
                                   },
+                                  onKillProcess: () => ref
+                                      .read(chatProvider.notifier)
+                                      .killCurrentProcess(),
+                                  onStdinWrite: (data) => ref
+                                      .read(sandboxServiceProvider)
+                                      .writeStdin(data),
                                 ),
                               ],
                             );

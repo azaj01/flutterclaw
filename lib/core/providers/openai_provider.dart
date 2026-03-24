@@ -136,12 +136,21 @@ class OpenAiProvider implements LlmProvider {
                 acc.arguments += args;
               }
             }
+            // Capture provider-specific fields (e.g. Gemini thought_signature)
+            for (final key in tcMap.keys) {
+              if (!const {'index', 'id', 'type', 'function'}.contains(key)) {
+                acc.extras[key] = tcMap[key];
+              }
+            }
           }
         }
 
         if (finishReason != null && finishReason.isNotEmpty) {
-          // Emit complete tool calls when message ends (in index order)
-          if (finishReason == 'tool_calls' && toolCallBuffers.isNotEmpty) {
+          // Emit complete tool calls when message ends (in index order).
+          // Check for any accumulated tool calls regardless of finish_reason
+          // value — Gemini's OpenAI-compatible endpoint may use "stop"
+          // instead of "tool_calls".
+          if (toolCallBuffers.isNotEmpty) {
             for (final index in toolCallBuffers.keys.toList()..sort()) {
               final acc = toolCallBuffers[index]!;
               if (acc.id != null && acc.name != null) {
@@ -153,6 +162,7 @@ class OpenAiProvider implements LlmProvider {
                       name: acc.name!,
                       arguments: acc.arguments,
                     ),
+                    extras: acc.extras.isEmpty ? null : acc.extras,
                   ),
                 );
               }
@@ -166,6 +176,27 @@ class OpenAiProvider implements LlmProvider {
             isDone: true,
           );
           return;
+        }
+      }
+    }
+
+    // Safety: if the stream ended without a finish_reason chunk (some
+    // providers just close the connection), emit any accumulated tool calls.
+    if (toolCallBuffers.isNotEmpty) {
+      for (final index in toolCallBuffers.keys.toList()..sort()) {
+        final acc = toolCallBuffers[index]!;
+        if (acc.id != null && acc.name != null) {
+          yield LlmStreamEvent(
+            toolCallDelta: ToolCall(
+              id: acc.id!,
+              type: 'function',
+              function: ToolCallFunction(
+                name: acc.name!,
+                arguments: acc.arguments,
+              ),
+              extras: acc.extras.isEmpty ? null : acc.extras,
+            ),
+          );
         }
       }
     }
@@ -705,6 +736,8 @@ class _ToolCallAccumulator {
   String? id;
   String? name;
   String arguments = '';
+  /// Provider-specific fields to round-trip (e.g. Gemini thought_signature).
+  Map<String, dynamic> extras = {};
 }
 
 /// Exception thrown by LLM providers.

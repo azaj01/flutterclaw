@@ -85,6 +85,7 @@ dependencies:
   pointycastle: ^3.9.1
   qr_flutter: ^4.1.0
   flutter_curve25519: ^0.1.2
+  xterm: ^4.0.0
 
 dev_dependencies:
   flutter_test:

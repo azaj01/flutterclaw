@@ -7,14 +7,17 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutterclaw/core/app_providers.dart';
 import 'package:flutterclaw/ui/theme/semantic_colors.dart';
 import 'copyable_code_block.dart';
+import 'terminal_output.dart';
 import 'typing_indicator.dart';
 
 /// A single chat message bubble (user, assistant, tool status, image, or document).
 class MessageBubble extends ConsumerStatefulWidget {
   final ChatMessage message;
   final VoidCallback onCopy;
+  final VoidCallback? onKillProcess;
+  final void Function(String data)? onStdinWrite;
 
-  const MessageBubble({super.key, required this.message, required this.onCopy});
+  const MessageBubble({super.key, required this.message, required this.onCopy, this.onKillProcess, this.onStdinWrite});
 
   @override
   ConsumerState<MessageBubble> createState() => _MessageBubbleState();
@@ -127,8 +130,11 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
             json.containsKey('exit_code') &&
             json.containsKey('stdout') &&
             json.containsKey('stderr')) {
-          // Render as terminal output
-          return _buildTerminalOutputFromJson(context, theme, jsonEncode(json));
+          // Render as xterm terminal output
+          return TerminalOutput(
+            command: 'shell',
+            output: jsonEncode(json),
+          );
         }
         // It's valid JSON but not a shell result - show as plain text
         return SelectableText(
@@ -263,9 +269,24 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
     final hasResult = widget.message.toolResultText != null;
     final isShellTool = widget.message.text.startsWith('run_shell_command');
 
-    // Shell commands always show terminal output directly (no pill)
-    if (isShellTool && !running && hasResult) {
-      return _buildTerminalOutput(context, theme);
+    // Shell commands show xterm terminal output directly (both streaming and completed)
+    if (isShellTool && (hasResult || running)) {
+      String command = 'shell';
+      if (widget.message.text.contains(': ')) {
+        command = widget.message.text.split(': ').skip(1).join(': ');
+      }
+      return TerminalOutput(
+        command: command,
+        output: widget.message.toolResultText,
+        isStreaming: running,
+        onKill: widget.onKillProcess,
+        onStdinWrite: running ? widget.onStdinWrite : null,
+      );
+    }
+
+    // Shell tool with no result yet and not streaming — show a minimal pill
+    if (isShellTool && !hasResult && !running) {
+      return const SizedBox.shrink();
     }
 
     return Center(
@@ -287,7 +308,7 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    isShellTool ? Icons.terminal : Icons.build_circle,
+                    Icons.build_circle,
                     size: 14,
                     color: colors.primary,
                   ),
@@ -356,339 +377,6 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
     );
   }
 
-  String _stripAnsiCodes(String text) {
-    // Remove ANSI escape codes (color codes, cursor movements, etc)
-    var cleaned = text;
-
-    // Handle actual ESC character (0x1B / \u001B)
-    cleaned = cleaned.replaceAll(RegExp(r'[\x1B\u001B]\[[0-9;]*[a-zA-Z]'), '');
-    cleaned = cleaned.replaceAll(RegExp(r'[\x1B\u001B]\([0-9;]*[a-zA-Z]'), '');
-    cleaned = cleaned.replaceAll(RegExp(r'[\x1B\u001B]\[[0-9;]*m'), '');
-
-    // Handle literal string "\u001b" (if double-escaped in JSON)
-    cleaned = cleaned.replaceAll(RegExp(r'\\u001[bB]\[[0-9;]*[a-zA-Z]'), '');
-    cleaned = cleaned.replaceAll(RegExp(r'\\u001[bB]\[[0-9;]*m'), '');
-
-    return cleaned;
-  }
-
-  Widget _buildTerminalOutputFromJson(BuildContext context, ThemeData theme, String jsonResult) {
-    final isDark = theme.brightness == Brightness.dark;
-    final terminalBg = isDark ? const Color(0xFF1E1E1E) : const Color(0xFF2D2D2D);
-    final terminalHeaderBg = isDark ? const Color(0xFF2D2D2D) : const Color(0xFF1E1E1E);
-    final terminalText = const Color(0xFF00FF00);
-    final terminalHeaderText = const Color(0xFFCCCCCC);
-    final errorText = const Color(0xFFFF5F56);
-
-    String output = '';
-    int exitCode = -1;
-
-    try {
-      var jsonText = jsonResult;
-
-      // Fix malformed JSON if it's missing the opening brace
-      if (!jsonText.trim().startsWith('{')) {
-        jsonText = '{$jsonText';
-      }
-
-      final result = jsonDecode(jsonText);
-      final stdout = (result['stdout'] as String?) ?? '';
-      final stderr = (result['stderr'] as String?) ?? '';
-      exitCode = (result['exit_code'] as int?) ?? -1;
-
-      output = _stripAnsiCodes(stdout);
-      if (stderr.isNotEmpty) {
-        if (output.isNotEmpty) output += '\n';
-        output += _stripAnsiCodes(stderr);
-      }
-
-      if (output.isEmpty && exitCode == 0) {
-        output = '(command completed successfully)';
-      }
-    } catch (e) {
-      // If JSON parsing fails, try to extract stdout with regex
-      final stdoutMatch = RegExp(r'"stdout"\s*:\s*"([^"]*)"').firstMatch(jsonResult);
-      final stderrMatch = RegExp(r'"stderr"\s*:\s*"([^"]*)"').firstMatch(jsonResult);
-
-      if (stdoutMatch != null || stderrMatch != null) {
-        output = _stripAnsiCodes((stdoutMatch?.group(1) ?? '') + (stderrMatch?.group(1) ?? ''));
-      } else {
-        // Last resort: show raw text but make it look like terminal output
-        output = jsonResult;
-      }
-    }
-
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.85,
-          maxHeight: 300,
-        ),
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        decoration: BoxDecoration(
-          color: terminalBg,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: terminalHeaderBg,
-            width: 1,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Terminal header
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: terminalHeaderBg,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(7),
-                  topRight: Radius.circular(7),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.terminal, size: 14, color: terminalHeaderText),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      exitCode == 0 ? 'exit $exitCode' : 'exit $exitCode (error)',
-                      style: TextStyle(
-                        color: terminalHeaderText,
-                        fontSize: 12,
-                        fontFamily: 'monospace',
-                        fontWeight: FontWeight.w500,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  // macOS control dots
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFFF5F56),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFFFBD2E),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF27C93F),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // Terminal output
-            Flexible(
-              child: SingleChildScrollView(
-                child: GestureDetector(
-                  onLongPress: widget.onCopy,
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    child: SelectableText(
-                      output.trim(),
-                      style: TextStyle(
-                        color: exitCode != 0 ? errorText : terminalText,
-                        fontSize: 13,
-                        fontFamily: 'monospace',
-                        height: 1.4,
-                        letterSpacing: 0.2,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTerminalOutput(BuildContext context, ThemeData theme) {
-    final isDark = theme.brightness == Brightness.dark;
-    final terminalBg = isDark ? const Color(0xFF1E1E1E) : const Color(0xFF2D2D2D);
-    final terminalHeaderBg = isDark ? const Color(0xFF2D2D2D) : const Color(0xFF1E1E1E);
-    final terminalText = const Color(0xFF00FF00);
-    final terminalHeaderText = const Color(0xFFCCCCCC);
-    final errorText = const Color(0xFFFF5F56);
-
-    // Extract command from message text (format: "run_shell_command: <cmd>")
-    String command = 'shell';
-    if (widget.message.text.contains(': ')) {
-      command = widget.message.text.split(': ').skip(1).join(': ');
-    }
-
-    String output = '';
-    int exitCode = -1;
-
-    try {
-      var jsonText = widget.message.toolResultText!;
-
-      // Fix malformed JSON if it's missing the opening brace
-      if (!jsonText.trim().startsWith('{')) {
-        jsonText = '{$jsonText';
-      }
-
-      final result = jsonDecode(jsonText);
-      final stdout = (result['stdout'] as String?) ?? '';
-      final stderr = (result['stderr'] as String?) ?? '';
-      exitCode = (result['exit_code'] as int?) ?? -1;
-
-      // Combine and clean stdout and stderr (remove ANSI color codes)
-      output = _stripAnsiCodes(stdout);
-      if (stderr.isNotEmpty) {
-        if (output.isNotEmpty) output += '\n';
-        output += _stripAnsiCodes(stderr);
-      }
-
-      // Handle empty output cases
-      if (output.trim().isEmpty) {
-        if (exitCode == 0) {
-          output = '(command completed successfully)';
-        } else if (result['timed_out'] == true) {
-          output = 'Command timed out (>30s).\nTry using a longer timeout for network operations like "apk add".';
-          exitCode = 124; // Standard timeout exit code
-        } else {
-          output = '(no output, exit code: $exitCode)';
-        }
-      }
-    } catch (e) {
-      // If JSON parsing fails, try to extract stdout with regex
-      final text = widget.message.toolResultText!;
-      final stdoutMatch = RegExp(r'"stdout"\s*:\s*"([^"]*)"').firstMatch(text);
-      final stderrMatch = RegExp(r'"stderr"\s*:\s*"([^"]*)"').firstMatch(text);
-      final timedOutMatch = RegExp(r'"timed_out"\s*:\s*true').hasMatch(text);
-
-      if (timedOutMatch) {
-        output = 'Command timed out (>30s).\nTry using a longer timeout for network operations like "apk add".';
-        exitCode = 124;
-      } else if (stdoutMatch != null || stderrMatch != null) {
-        output = _stripAnsiCodes((stdoutMatch?.group(1) ?? '') + (stderrMatch?.group(1) ?? ''));
-        if (output.trim().isEmpty) {
-          output = '(no output)';
-        }
-      } else {
-        // Last resort: show raw text but make it look like terminal output
-        output = text.isNotEmpty ? text : '(empty result)';
-      }
-    }
-
-    return Container(
-      constraints: BoxConstraints(
-        maxWidth: MediaQuery.of(context).size.width * 0.85,
-        maxHeight: 300,
-      ),
-      margin: const EdgeInsets.only(bottom: 4),
-      decoration: BoxDecoration(
-        color: terminalBg,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: terminalHeaderBg,
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Terminal header
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: terminalHeaderBg,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(7),
-                topRight: Radius.circular(7),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.terminal, size: 14, color: terminalHeaderText),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    '\$ $command',
-                    style: TextStyle(
-                      color: terminalHeaderText,
-                      fontSize: 12,
-                      fontFamily: 'monospace',
-                      fontWeight: FontWeight.w500,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                // macOS control dots
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFFF5F56),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFFFFBD2E),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF27C93F),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Terminal output
-          Flexible(
-            child: SingleChildScrollView(
-              child: GestureDetector(
-                onLongPress: widget.onCopy,
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  child: SelectableText(
-                    output.trim(),
-                    style: TextStyle(
-                      color: exitCode != 0 ? errorText : terminalText,
-                      fontSize: 13,
-                      fontFamily: 'monospace',
-                      height: 1.4,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildSlashCommandBubble(BuildContext context, ThemeData theme) {
     final colors = theme.colorScheme;
@@ -741,120 +429,20 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
   }
 
   Widget _buildShellCommandBubble(BuildContext context, ThemeData theme) {
-    final isDark = theme.brightness == Brightness.dark;
-
     // Parse the command output - extract from markdown code block if present
     String outputText = widget.message.text;
-    String? command;
+    String command = 'alpine-shell';
 
     // Extract command from markdown: ```\n$ command\noutput\n```
     final codeBlockMatch = RegExp(r'```\n\$ (.+?)\n([\s\S]*?)```').firstMatch(outputText);
     if (codeBlockMatch != null) {
-      command = codeBlockMatch.group(1);
+      command = codeBlockMatch.group(1) ?? command;
       outputText = codeBlockMatch.group(2) ?? '';
     }
 
-    // Terminal colors
-    final terminalBg = isDark ? const Color(0xFF1E1E1E) : const Color(0xFF2D2D2D);
-    final terminalHeaderBg = isDark ? const Color(0xFF2D2D2D) : const Color(0xFF1E1E1E);
-    final terminalText = const Color(0xFF00FF00); // Classic green terminal text
-    final terminalHeaderText = const Color(0xFFCCCCCC);
-
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.85,
-        ),
-        margin: const EdgeInsets.symmetric(vertical: 4),
-        decoration: BoxDecoration(
-          color: terminalBg,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: terminalHeaderBg,
-            width: 1,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Terminal header bar
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: terminalHeaderBg,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(7),
-                  topRight: Radius.circular(7),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.terminal, size: 14, color: terminalHeaderText),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      command ?? 'alpine-shell',
-                      style: TextStyle(
-                        color: terminalHeaderText,
-                        fontSize: 12,
-                        fontFamily: 'monospace',
-                        fontWeight: FontWeight.w500,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  // Terminal control dots
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFFF5F56),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFFFBD2E),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF27C93F),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // Terminal output content
-            GestureDetector(
-              onLongPress: widget.onCopy,
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                child: SelectableText(
-                  outputText.trim(),
-                  style: TextStyle(
-                    color: terminalText,
-                    fontSize: 13,
-                    fontFamily: 'monospace',
-                    height: 1.4,
-                    letterSpacing: 0.2,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    return TerminalOutput(
+      command: command,
+      output: outputText.trim(),
     );
   }
 
