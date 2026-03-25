@@ -229,9 +229,7 @@ class _ChannelsPageState extends State<ChannelsPage> {
                     iconColor: colors.onSurfaceVariant,
                   ),
                   title: const Text('WhatsApp'),
-                  subtitle: const Text(
-                    'Pair your personal WhatsApp account with a QR code',
-                  ),
+                  subtitle: Text(context.l10n.whatsAppPairSubtitle),
                   value: _whatsappEnabled,
                   onChanged: (value) async {
                     setState(() => _whatsappEnabled = value);
@@ -250,7 +248,7 @@ class _ChannelsPageState extends State<ChannelsPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Pairing is optional. You can finish onboarding now and complete the link later.',
+                          context.l10n.whatsAppPairingOptional,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: colors.onSurfaceVariant,
                           ),
@@ -260,13 +258,12 @@ class _ChannelsPageState extends State<ChannelsPage> {
                           status: _whatsAppStatus,
                           qrCode: _whatsAppQrCode,
                           isRestartPending: _waRestartPending,
-                          idleDescription:
-                              'Enable WhatsApp to start linking this device.',
+                          idleDescription: context.l10n.whatsAppEnableToLink,
                           connectingDescription: _waRestartPending
-                              ? 'WhatsApp accepted the QR. Finalizing the link...'
-                              : 'Waiting for WhatsApp to complete the link...',
+                              ? context.l10n.whatsAppAcceptedQr
+                              : context.l10n.waitingForWhatsApp,
                           connectedDescription:
-                              'WhatsApp is linked. FlutterClaw will be able to respond after onboarding.',
+                              context.l10n.whatsAppLinkedOnboarding,
                           footer: Row(
                             children: [
                               Expanded(
@@ -276,7 +273,7 @@ class _ChannelsPageState extends State<ChannelsPage> {
                                       : _retryWhatsAppLinking,
                                   icon: const Icon(Icons.refresh),
                                   label: Text(
-                                    _startingWhatsApp ? 'Starting...' : 'Retry',
+                                    _startingWhatsApp ? context.l10n.starting : context.l10n.retry,
                                   ),
                                 ),
                               ),
@@ -284,7 +281,7 @@ class _ChannelsPageState extends State<ChannelsPage> {
                               Expanded(
                                 child: TextButton(
                                   onPressed: _stopWhatsAppLinking,
-                                  child: const Text('Cancel Link'),
+                                  child: Text(context.l10n.cancelLink),
                                 ),
                               ),
                             ],

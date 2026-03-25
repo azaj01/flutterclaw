@@ -1319,16 +1319,16 @@ class AppLocalizationsFr extends AppLocalizations {
   String get voiceInput => 'Saisie vocale';
 
   @override
-  String get speakMessage => 'Speak';
+  String get speakMessage => 'Lire à voix haute';
 
   @override
-  String get stopSpeaking => 'Stop speaking';
+  String get stopSpeaking => 'Arrêter la lecture';
 
   @override
-  String get selectText => 'Select Text';
+  String get selectText => 'Sélectionner le texte';
 
   @override
-  String get messageCopied => 'Message copied';
+  String get messageCopied => 'Message copié';
 
   @override
   String get copyTooltip => 'Copier';
@@ -1710,4 +1710,135 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get skipAction => 'Passer';
+
+  @override
+  String get mcpServers => 'Serveurs MCP';
+
+  @override
+  String get noMcpServersConfigured => 'Aucun serveur MCP configuré';
+
+  @override
+  String get mcpServersEmptyHint =>
+      'Ajoutez des serveurs MCP pour donner à votre agent accès aux outils de GitHub, Notion, Slack, bases de données et plus.';
+
+  @override
+  String get addMcpServer => 'Ajouter un serveur MCP';
+
+  @override
+  String get editMcpServer => 'Modifier le serveur MCP';
+
+  @override
+  String get removeMcpServer => 'Supprimer le serveur MCP';
+
+  @override
+  String removeMcpServerConfirm(String name) {
+    return 'Supprimer \"$name\" ? Ses outils ne seront plus disponibles.';
+  }
+
+  @override
+  String get mcpTransport => 'Transport';
+
+  @override
+  String get testConnection => 'Tester la connexion';
+
+  @override
+  String get mcpServerNameLabel => 'Nom du serveur';
+
+  @override
+  String get mcpServerNameHint => 'ex. GitHub, Notion, Ma BD';
+
+  @override
+  String get mcpServerUrlLabel => 'URL du serveur';
+
+  @override
+  String get mcpBearerTokenLabel => 'Token Bearer (optionnel)';
+
+  @override
+  String get mcpBearerTokenHint =>
+      'Laisser vide si aucune authentification requise';
+
+  @override
+  String get mcpCommandLabel => 'Commande';
+
+  @override
+  String get mcpArgumentsLabel => 'Arguments (séparés par des espaces)';
+
+  @override
+  String get mcpEnvVarsLabel =>
+      'Variables d\'environnement (CLÉ=VALEUR, une par ligne)';
+
+  @override
+  String get mcpStdioNotOnIos =>
+      'stdio n\'est pas disponible sur iOS. Utilisez HTTP ou SSE.';
+
+  @override
+  String get connectedStatus => 'Connecté';
+
+  @override
+  String get mcpConnecting => 'Connexion...';
+
+  @override
+  String get mcpConnectionError => 'Erreur de connexion';
+
+  @override
+  String get mcpDisconnected => 'Déconnecté';
+
+  @override
+  String mcpToolsCount(int count) {
+    return '$count outils';
+  }
+
+  @override
+  String mcpTestOkTools(int count) {
+    return 'OK — $count outils découverts';
+  }
+
+  @override
+  String get mcpTestOkNoTools => 'OK — Connecté (0 outil)';
+
+  @override
+  String get mcpTestFailed =>
+      'Échec de la connexion. Vérifiez l\'URL/token du serveur.';
+
+  @override
+  String get mcpAddServer => 'Ajouter un serveur';
+
+  @override
+  String get mcpSaveChanges => 'Enregistrer les modifications';
+
+  @override
+  String get urlIsRequired => 'L\'URL est obligatoire';
+
+  @override
+  String get enterValidUrl => 'Entrez une URL valide';
+
+  @override
+  String get commandIsRequired => 'La commande est obligatoire';
+
+  @override
+  String skillRemoved(String name) {
+    return 'Compétence \"$name\" supprimée';
+  }
+
+  @override
+  String get editFileContentHint => 'Modifier le contenu du fichier...';
+
+  @override
+  String get whatsAppPairSubtitle =>
+      'Associez votre compte WhatsApp personnel avec un code QR';
+
+  @override
+  String get whatsAppPairingOptional =>
+      'L\'association est optionnelle. Vous pouvez terminer le processus maintenant et compléter le lien plus tard.';
+
+  @override
+  String get whatsAppEnableToLink =>
+      'Activez WhatsApp pour commencer à lier cet appareil.';
+
+  @override
+  String get whatsAppLinkedOnboarding =>
+      'WhatsApp est lié. FlutterClaw pourra répondre après la configuration initiale.';
+
+  @override
+  String get cancelLink => 'Annuler le lien';
 }

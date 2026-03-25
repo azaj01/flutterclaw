@@ -1304,16 +1304,16 @@ class AppLocalizationsUk extends AppLocalizations {
   String get voiceInput => 'Голосове введення';
 
   @override
-  String get speakMessage => 'Speak';
+  String get speakMessage => 'Озвучити';
 
   @override
-  String get stopSpeaking => 'Stop speaking';
+  String get stopSpeaking => 'Зупинити озвучення';
 
   @override
-  String get selectText => 'Select Text';
+  String get selectText => 'Вибрати текст';
 
   @override
-  String get messageCopied => 'Message copied';
+  String get messageCopied => 'Повідомлення скопійовано';
 
   @override
   String get copyTooltip => 'Копіювати';
@@ -1702,4 +1702,135 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get skipAction => 'Пропустити';
+
+  @override
+  String get mcpServers => 'MCP-сервери';
+
+  @override
+  String get noMcpServersConfigured => 'MCP-сервери не налаштовані';
+
+  @override
+  String get mcpServersEmptyHint =>
+      'Додайте MCP-сервери, щоб надати агенту доступ до інструментів GitHub, Notion, Slack, баз даних та інших сервісів.';
+
+  @override
+  String get addMcpServer => 'Додати MCP-сервер';
+
+  @override
+  String get editMcpServer => 'Редагувати MCP-сервер';
+
+  @override
+  String get removeMcpServer => 'Видалити MCP-сервер';
+
+  @override
+  String removeMcpServerConfirm(String name) {
+    return 'Видалити \"$name\"? Його інструменти стануть недоступними.';
+  }
+
+  @override
+  String get mcpTransport => 'Транспорт';
+
+  @override
+  String get testConnection => 'Перевірити з\'єднання';
+
+  @override
+  String get mcpServerNameLabel => 'Назва сервера';
+
+  @override
+  String get mcpServerNameHint => 'напр. GitHub, Notion, Моя БД';
+
+  @override
+  String get mcpServerUrlLabel => 'URL сервера';
+
+  @override
+  String get mcpBearerTokenLabel => 'Bearer-токен (необов\'язково)';
+
+  @override
+  String get mcpBearerTokenHint =>
+      'Залишіть порожнім, якщо авторизація не потрібна';
+
+  @override
+  String get mcpCommandLabel => 'Команда';
+
+  @override
+  String get mcpArgumentsLabel => 'Аргументи (через пробіл)';
+
+  @override
+  String get mcpEnvVarsLabel =>
+      'Змінні середовища (КЛЮЧ=ЗНАЧЕННЯ, по одному на рядок)';
+
+  @override
+  String get mcpStdioNotOnIos =>
+      'stdio недоступний на iOS. Використовуйте HTTP або SSE.';
+
+  @override
+  String get connectedStatus => 'Підключено';
+
+  @override
+  String get mcpConnecting => 'Підключення...';
+
+  @override
+  String get mcpConnectionError => 'Помилка підключення';
+
+  @override
+  String get mcpDisconnected => 'Відключено';
+
+  @override
+  String mcpToolsCount(int count) {
+    return '$count інструментів';
+  }
+
+  @override
+  String mcpTestOkTools(int count) {
+    return 'OK — знайдено $count інструментів';
+  }
+
+  @override
+  String get mcpTestOkNoTools => 'OK — Підключено (0 інструментів)';
+
+  @override
+  String get mcpTestFailed =>
+      'Помилка підключення. Перевірте URL/токен сервера.';
+
+  @override
+  String get mcpAddServer => 'Додати сервер';
+
+  @override
+  String get mcpSaveChanges => 'Зберегти зміни';
+
+  @override
+  String get urlIsRequired => 'URL є обов\'язковим';
+
+  @override
+  String get enterValidUrl => 'Введіть коректний URL';
+
+  @override
+  String get commandIsRequired => 'Команда є обов\'язковою';
+
+  @override
+  String skillRemoved(String name) {
+    return 'Навичку \"$name\" видалено';
+  }
+
+  @override
+  String get editFileContentHint => 'Редагувати вміст файлу...';
+
+  @override
+  String get whatsAppPairSubtitle =>
+      'Прив\'яжіть особистий акаунт WhatsApp за допомогою QR-коду';
+
+  @override
+  String get whatsAppPairingOptional =>
+      'Прив\'язка необов\'язкова. Ви можете завершити налаштування зараз і додати прив\'язку пізніше.';
+
+  @override
+  String get whatsAppEnableToLink =>
+      'Увімкніть WhatsApp, щоб почати прив\'язку пристрою.';
+
+  @override
+  String get whatsAppLinkedOnboarding =>
+      'WhatsApp прив\'язано. FlutterClaw зможе відповідати після завершення налаштування.';
+
+  @override
+  String get cancelLink => 'Скасувати прив\'язку';
 }

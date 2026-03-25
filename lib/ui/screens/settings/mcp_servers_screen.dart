@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutterclaw/core/app_providers.dart';
 import 'package:flutterclaw/data/models/mcp_server_config.dart';
+import 'package:flutterclaw/l10n/l10n_extension.dart';
 import 'package:flutterclaw/ui/theme/tokens.dart';
 
 class McpServersScreen extends ConsumerWidget {
@@ -25,7 +26,7 @@ class McpServersScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('MCP Servers'),
+        title: Text(context.l10n.mcpServers),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
@@ -44,13 +45,12 @@ class McpServersScreen extends ConsumerWidget {
                         size: 56, color: colors.onSurfaceVariant),
                     const SizedBox(height: 16),
                     Text(
-                      'No MCP servers configured',
+                      context.l10n.noMcpServersConfigured,
                       style: theme.textTheme.titleMedium,
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Add MCP servers to give your agent access to tools '
-                      'from GitHub, Notion, Slack, databases, and more.',
+                      context.l10n.mcpServersEmptyHint,
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: colors.onSurfaceVariant,
@@ -59,7 +59,7 @@ class McpServersScreen extends ConsumerWidget {
                     const SizedBox(height: 24),
                     FilledButton.icon(
                       icon: const Icon(Icons.add),
-                      label: const Text('Add MCP Server'),
+                      label: Text(context.l10n.addMcpServer),
                       onPressed: () => _openEditor(context, ref, null),
                     ),
                   ],
@@ -126,16 +126,15 @@ class McpServersScreen extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Remove MCP Server'),
-        content: Text(
-            'Remove "${server.name}"? Its tools will no longer be available.'),
+        title: Text(context.l10n.removeMcpServer),
+        content: Text(context.l10n.removeMcpServerConfirm(server.name)),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel')),
+              child: Text(context.l10n.cancel)),
           FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('Remove')),
+              child: Text(context.l10n.remove)),
         ],
       ),
     );
@@ -207,7 +206,7 @@ class _McpServerTile extends ConsumerWidget {
                             ?.copyWith(fontWeight: FontWeight.w600)),
                     const SizedBox(height: 2),
                     Text(
-                      _subtitle(server, status, toolCount),
+                      _subtitle(context, server, status, toolCount),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: colors.onSurfaceVariant,
                       ),
@@ -249,8 +248,9 @@ class _McpServerTile extends ConsumerWidget {
     };
   }
 
-  String _subtitle(
+  String _subtitle(BuildContext context,
       McpServerEntry server, McpConnectionStatus status, int toolCount) {
+    final l10n = context.l10n;
     final transport = switch (server.transportType) {
       McpTransportType.http => 'HTTP',
       McpTransportType.sse => 'SSE',
@@ -258,10 +258,10 @@ class _McpServerTile extends ConsumerWidget {
     };
     final statusStr = switch (status) {
       McpConnectionStatus.connected =>
-        toolCount > 0 ? '$toolCount tools' : 'Connected',
-      McpConnectionStatus.connecting => 'Connecting...',
-      McpConnectionStatus.error => 'Connection error',
-      McpConnectionStatus.disconnected => 'Disconnected',
+        toolCount > 0 ? l10n.mcpToolsCount(toolCount) : l10n.connectedStatus,
+      McpConnectionStatus.connecting => l10n.mcpConnecting,
+      McpConnectionStatus.error => l10n.mcpConnectionError,
+      McpConnectionStatus.disconnected => l10n.mcpDisconnected,
     };
     return '$transport · $statusStr';
   }
@@ -329,7 +329,7 @@ class _McpServerEditorScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isEdit ? 'Edit MCP Server' : 'Add MCP Server'),
+        title: Text(isEdit ? context.l10n.editMcpServer : context.l10n.addMcpServer),
       ),
       body: Form(
         key: _formKey,
@@ -339,18 +339,18 @@ class _McpServerEditorScreenState
             // Name
             TextFormField(
               controller: _nameCtrl,
-              decoration: const InputDecoration(
-                labelText: 'Server name',
-                hintText: 'e.g. GitHub, Notion, My DB',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: context.l10n.mcpServerNameLabel,
+                hintText: context.l10n.mcpServerNameHint,
+                border: const OutlineInputBorder(),
               ),
               validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Name is required' : null,
+                  (v == null || v.trim().isEmpty) ? context.l10n.nameIsRequired : null,
             ),
             const SizedBox(height: 16),
 
             // Transport type
-            Text('Transport', style: theme.textTheme.labelLarge),
+            Text(context.l10n.mcpTransport, style: theme.textTheme.labelLarge),
             const SizedBox(height: 8),
             SegmentedButton<McpTransportType>(
               segments: [
@@ -377,7 +377,7 @@ class _McpServerEditorScreenState
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
-                  'stdio is not available on iOS. Use HTTP or SSE instead.',
+                  context.l10n.mcpStdioNotOnIos,
                   style: theme.textTheme.bodySmall
                       ?.copyWith(color: colors.error),
                 ),
@@ -390,26 +390,26 @@ class _McpServerEditorScreenState
                 _transportType == McpTransportType.sse) ...[
               TextFormField(
                 controller: _urlCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Server URL',
+                decoration: InputDecoration(
+                  labelText: context.l10n.mcpServerUrlLabel,
                   hintText: 'https://mcp.example.com/mcp',
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
                 ),
                 keyboardType: TextInputType.url,
                 validator: (v) {
-                  if (v == null || v.trim().isEmpty) return 'URL is required';
+                  if (v == null || v.trim().isEmpty) return context.l10n.urlIsRequired;
                   final uri = Uri.tryParse(v.trim());
-                  if (uri == null || !uri.hasScheme) return 'Enter a valid URL';
+                  if (uri == null || !uri.hasScheme) return context.l10n.enterValidUrl;
                   return null;
                 },
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _tokenCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Bearer token (optional)',
-                  hintText: 'Leave blank if no auth required',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: context.l10n.mcpBearerTokenLabel,
+                  hintText: context.l10n.mcpBearerTokenHint,
+                  border: const OutlineInputBorder(),
                 ),
                 obscureText: true,
               ),
@@ -419,31 +419,31 @@ class _McpServerEditorScreenState
             if (_transportType == McpTransportType.stdio) ...[
               TextFormField(
                 controller: _commandCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Command',
+                decoration: InputDecoration(
+                  labelText: context.l10n.mcpCommandLabel,
                   hintText: 'e.g. npx or python3',
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
                 ),
                 validator: (v) => (v == null || v.trim().isEmpty)
-                    ? 'Command is required'
+                    ? context.l10n.commandIsRequired
                     : null,
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _argsCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Arguments (space-separated)',
+                decoration: InputDecoration(
+                  labelText: context.l10n.mcpArgumentsLabel,
                   hintText: 'e.g. -y @modelcontextprotocol/server-github',
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
                 ),
               ),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _envCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Environment variables (KEY=VALUE, one per line)',
+                decoration: InputDecoration(
+                  labelText: context.l10n.mcpEnvVarsLabel,
                   hintText: 'GITHUB_TOKEN=ghp_...',
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
                 ),
                 maxLines: 3,
                 keyboardType: TextInputType.multiline,
@@ -460,7 +460,7 @@ class _McpServerEditorScreenState
                       height: 16,
                       child: CircularProgressIndicator(strokeWidth: 2))
                   : const Icon(Icons.electrical_services_outlined),
-              label: const Text('Test Connection'),
+              label: Text(context.l10n.testConnection),
               onPressed: _testing ? null : _testConnection,
             ),
 
@@ -489,7 +489,7 @@ class _McpServerEditorScreenState
 
             FilledButton(
               onPressed: _save,
-              child: Text(isEdit ? 'Save changes' : 'Add server'),
+              child: Text(isEdit ? context.l10n.mcpSaveChanges : context.l10n.mcpAddServer),
             ),
           ],
         ),
@@ -499,6 +499,7 @@ class _McpServerEditorScreenState
 
   Future<void> _testConnection() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
+    final l10n = context.l10n;
     setState(() {
       _testing = true;
       _testResult = null;
@@ -517,17 +518,17 @@ class _McpServerEditorScreenState
       await mcpManager.connectServer(entry);
       final tools = mcpManager.getDiscoveredTools(entry.id);
       if (tools.isNotEmpty) {
-        setState(() => _testResult = 'OK — ${tools.length} tools discovered');
+        setState(() => _testResult = l10n.mcpTestOkTools(tools.length));
       } else {
         final status = mcpManager.getStatus(entry.id);
         if (status == McpConnectionStatus.connected) {
-          setState(() => _testResult = 'OK — Connected (0 tools)');
+          setState(() => _testResult = l10n.mcpTestOkNoTools);
         } else {
-          setState(() => _testResult = 'Connection failed. Check server URL/token.');
+          setState(() => _testResult = l10n.mcpTestFailed);
         }
       }
     } catch (e) {
-      setState(() => _testResult = 'Error: $e');
+      setState(() => _testResult = context.l10n.errorGeneric(e.toString()));
     } finally {
       setState(() => _testing = false);
     }

@@ -1312,16 +1312,16 @@ class AppLocalizationsPt extends AppLocalizations {
   String get voiceInput => 'Entrada de voz';
 
   @override
-  String get speakMessage => 'Speak';
+  String get speakMessage => 'Ler em voz alta';
 
   @override
-  String get stopSpeaking => 'Stop speaking';
+  String get stopSpeaking => 'Parar leitura';
 
   @override
-  String get selectText => 'Select Text';
+  String get selectText => 'Selecionar texto';
 
   @override
-  String get messageCopied => 'Message copied';
+  String get messageCopied => 'Mensagem copiada';
 
   @override
   String get copyTooltip => 'Copiar';
@@ -1702,4 +1702,134 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get skipAction => 'Pular';
+
+  @override
+  String get mcpServers => 'Servidores MCP';
+
+  @override
+  String get noMcpServersConfigured => 'Nenhum servidor MCP configurado';
+
+  @override
+  String get mcpServersEmptyHint =>
+      'Adicione servidores MCP para dar ao seu agente acesso a ferramentas do GitHub, Notion, Slack, bancos de dados e mais.';
+
+  @override
+  String get addMcpServer => 'Adicionar servidor MCP';
+
+  @override
+  String get editMcpServer => 'Editar servidor MCP';
+
+  @override
+  String get removeMcpServer => 'Remover servidor MCP';
+
+  @override
+  String removeMcpServerConfirm(String name) {
+    return 'Remover \"$name\"? Suas ferramentas não estarão mais disponíveis.';
+  }
+
+  @override
+  String get mcpTransport => 'Transporte';
+
+  @override
+  String get testConnection => 'Testar conexão';
+
+  @override
+  String get mcpServerNameLabel => 'Nome do servidor';
+
+  @override
+  String get mcpServerNameHint => 'ex. GitHub, Notion, Meu BD';
+
+  @override
+  String get mcpServerUrlLabel => 'URL do servidor';
+
+  @override
+  String get mcpBearerTokenLabel => 'Token Bearer (opcional)';
+
+  @override
+  String get mcpBearerTokenHint => 'Deixe em branco se não requer autenticação';
+
+  @override
+  String get mcpCommandLabel => 'Comando';
+
+  @override
+  String get mcpArgumentsLabel => 'Argumentos (separados por espaço)';
+
+  @override
+  String get mcpEnvVarsLabel =>
+      'Variáveis de ambiente (CHAVE=VALOR, uma por linha)';
+
+  @override
+  String get mcpStdioNotOnIos =>
+      'stdio não está disponível no iOS. Use HTTP ou SSE.';
+
+  @override
+  String get connectedStatus => 'Conectado';
+
+  @override
+  String get mcpConnecting => 'Conectando...';
+
+  @override
+  String get mcpConnectionError => 'Erro de conexão';
+
+  @override
+  String get mcpDisconnected => 'Desconectado';
+
+  @override
+  String mcpToolsCount(int count) {
+    return '$count ferramentas';
+  }
+
+  @override
+  String mcpTestOkTools(int count) {
+    return 'OK — $count ferramentas descobertas';
+  }
+
+  @override
+  String get mcpTestOkNoTools => 'OK — Conectado (0 ferramentas)';
+
+  @override
+  String get mcpTestFailed =>
+      'Falha na conexão. Verifique a URL/token do servidor.';
+
+  @override
+  String get mcpAddServer => 'Adicionar servidor';
+
+  @override
+  String get mcpSaveChanges => 'Salvar alterações';
+
+  @override
+  String get urlIsRequired => 'A URL é obrigatória';
+
+  @override
+  String get enterValidUrl => 'Insira uma URL válida';
+
+  @override
+  String get commandIsRequired => 'O comando é obrigatório';
+
+  @override
+  String skillRemoved(String name) {
+    return 'Habilidade \"$name\" removida';
+  }
+
+  @override
+  String get editFileContentHint => 'Editar conteúdo do arquivo...';
+
+  @override
+  String get whatsAppPairSubtitle =>
+      'Vincule sua conta pessoal do WhatsApp com um código QR';
+
+  @override
+  String get whatsAppPairingOptional =>
+      'A vinculação é opcional. Você pode terminar o processo agora e completar o link depois.';
+
+  @override
+  String get whatsAppEnableToLink =>
+      'Ative o WhatsApp para começar a vincular este dispositivo.';
+
+  @override
+  String get whatsAppLinkedOnboarding =>
+      'WhatsApp está vinculado. FlutterClaw poderá responder após a configuração inicial.';
+
+  @override
+  String get cancelLink => 'Cancelar link';
 }

@@ -1312,16 +1312,16 @@ class AppLocalizationsNl extends AppLocalizations {
   String get voiceInput => 'Spraakinvoer';
 
   @override
-  String get speakMessage => 'Speak';
+  String get speakMessage => 'Voorlezen';
 
   @override
-  String get stopSpeaking => 'Stop speaking';
+  String get stopSpeaking => 'Stop met voorlezen';
 
   @override
-  String get selectText => 'Select Text';
+  String get selectText => 'Tekst selecteren';
 
   @override
-  String get messageCopied => 'Message copied';
+  String get messageCopied => 'Bericht gekopieerd';
 
   @override
   String get copyTooltip => 'Kopiëren';
@@ -1702,4 +1702,134 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get skipAction => 'Overslaan';
+
+  @override
+  String get mcpServers => 'MCP-servers';
+
+  @override
+  String get noMcpServersConfigured => 'Geen MCP-servers geconfigureerd';
+
+  @override
+  String get mcpServersEmptyHint =>
+      'Voeg MCP-servers toe om uw agent toegang te geven tot tools van GitHub, Notion, Slack, databases en meer.';
+
+  @override
+  String get addMcpServer => 'MCP-server toevoegen';
+
+  @override
+  String get editMcpServer => 'MCP-server bewerken';
+
+  @override
+  String get removeMcpServer => 'MCP-server verwijderen';
+
+  @override
+  String removeMcpServerConfirm(String name) {
+    return '\"$name\" verwijderen? De tools ervan zijn dan niet meer beschikbaar.';
+  }
+
+  @override
+  String get mcpTransport => 'Transport';
+
+  @override
+  String get testConnection => 'Verbinding testen';
+
+  @override
+  String get mcpServerNameLabel => 'Servernaam';
+
+  @override
+  String get mcpServerNameHint => 'bijv. GitHub, Notion, Mijn DB';
+
+  @override
+  String get mcpServerUrlLabel => 'Server-URL';
+
+  @override
+  String get mcpBearerTokenLabel => 'Bearer-token (optioneel)';
+
+  @override
+  String get mcpBearerTokenHint => 'Leeg laten als geen authenticatie vereist';
+
+  @override
+  String get mcpCommandLabel => 'Opdracht';
+
+  @override
+  String get mcpArgumentsLabel => 'Argumenten (gescheiden door spaties)';
+
+  @override
+  String get mcpEnvVarsLabel =>
+      'Omgevingsvariabelen (SLEUTEL=WAARDE, één per regel)';
+
+  @override
+  String get mcpStdioNotOnIos =>
+      'stdio is niet beschikbaar op iOS. Gebruik HTTP of SSE.';
+
+  @override
+  String get connectedStatus => 'Verbonden';
+
+  @override
+  String get mcpConnecting => 'Verbinden...';
+
+  @override
+  String get mcpConnectionError => 'Verbindingsfout';
+
+  @override
+  String get mcpDisconnected => 'Verbroken';
+
+  @override
+  String mcpToolsCount(int count) {
+    return '$count tools';
+  }
+
+  @override
+  String mcpTestOkTools(int count) {
+    return 'OK — $count tools ontdekt';
+  }
+
+  @override
+  String get mcpTestOkNoTools => 'OK — Verbonden (0 tools)';
+
+  @override
+  String get mcpTestFailed =>
+      'Verbinding mislukt. Controleer de server-URL/token.';
+
+  @override
+  String get mcpAddServer => 'Server toevoegen';
+
+  @override
+  String get mcpSaveChanges => 'Wijzigingen opslaan';
+
+  @override
+  String get urlIsRequired => 'URL is vereist';
+
+  @override
+  String get enterValidUrl => 'Voer een geldige URL in';
+
+  @override
+  String get commandIsRequired => 'Opdracht is vereist';
+
+  @override
+  String skillRemoved(String name) {
+    return 'Vaardigheid \"$name\" verwijderd';
+  }
+
+  @override
+  String get editFileContentHint => 'Bestandsinhoud bewerken...';
+
+  @override
+  String get whatsAppPairSubtitle =>
+      'Koppel uw persoonlijke WhatsApp-account met een QR-code';
+
+  @override
+  String get whatsAppPairingOptional =>
+      'Koppelen is optioneel. U kunt de onboarding nu afronden en de koppeling later voltooien.';
+
+  @override
+  String get whatsAppEnableToLink =>
+      'Schakel WhatsApp in om dit apparaat te koppelen.';
+
+  @override
+  String get whatsAppLinkedOnboarding =>
+      'WhatsApp is gekoppeld. FlutterClaw kan reageren na de onboarding.';
+
+  @override
+  String get cancelLink => 'Koppeling annuleren';
 }

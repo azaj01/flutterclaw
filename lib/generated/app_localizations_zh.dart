@@ -1262,16 +1262,16 @@ class AppLocalizationsZh extends AppLocalizations {
   String get voiceInput => '语音输入';
 
   @override
-  String get speakMessage => 'Speak';
+  String get speakMessage => '朗读';
 
   @override
-  String get stopSpeaking => 'Stop speaking';
+  String get stopSpeaking => '停止朗读';
 
   @override
-  String get selectText => 'Select Text';
+  String get selectText => '选择文本';
 
   @override
-  String get messageCopied => 'Message copied';
+  String get messageCopied => '消息已复制';
 
   @override
   String get copyTooltip => '复制';
@@ -1615,4 +1615,128 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get skipAction => '跳过';
+
+  @override
+  String get mcpServers => 'MCP 服务器';
+
+  @override
+  String get noMcpServersConfigured => '未配置 MCP 服务器';
+
+  @override
+  String get mcpServersEmptyHint =>
+      '添加 MCP 服务器，让您的代理访问 GitHub、Notion、Slack、数据库等工具。';
+
+  @override
+  String get addMcpServer => '添加 MCP 服务器';
+
+  @override
+  String get editMcpServer => '编辑 MCP 服务器';
+
+  @override
+  String get removeMcpServer => '删除 MCP 服务器';
+
+  @override
+  String removeMcpServerConfirm(String name) {
+    return '删除\"$name\"？其工具将不再可用。';
+  }
+
+  @override
+  String get mcpTransport => '传输方式';
+
+  @override
+  String get testConnection => '测试连接';
+
+  @override
+  String get mcpServerNameLabel => '服务器名称';
+
+  @override
+  String get mcpServerNameHint => '如 GitHub、Notion、我的数据库';
+
+  @override
+  String get mcpServerUrlLabel => '服务器 URL';
+
+  @override
+  String get mcpBearerTokenLabel => 'Bearer 令牌（可选）';
+
+  @override
+  String get mcpBearerTokenHint => '不需要认证时留空';
+
+  @override
+  String get mcpCommandLabel => '命令';
+
+  @override
+  String get mcpArgumentsLabel => '参数（空格分隔）';
+
+  @override
+  String get mcpEnvVarsLabel => '环境变量（键=值，每行一个）';
+
+  @override
+  String get mcpStdioNotOnIos => 'stdio 在 iOS 上不可用，请使用 HTTP 或 SSE。';
+
+  @override
+  String get connectedStatus => '已连接';
+
+  @override
+  String get mcpConnecting => '连接中...';
+
+  @override
+  String get mcpConnectionError => '连接错误';
+
+  @override
+  String get mcpDisconnected => '已断开';
+
+  @override
+  String mcpToolsCount(int count) {
+    return '$count 个工具';
+  }
+
+  @override
+  String mcpTestOkTools(int count) {
+    return '成功 — 发现 $count 个工具';
+  }
+
+  @override
+  String get mcpTestOkNoTools => '成功 — 已连接（0 个工具）';
+
+  @override
+  String get mcpTestFailed => '连接失败，请检查服务器 URL/令牌。';
+
+  @override
+  String get mcpAddServer => '添加服务器';
+
+  @override
+  String get mcpSaveChanges => '保存更改';
+
+  @override
+  String get urlIsRequired => 'URL 为必填项';
+
+  @override
+  String get enterValidUrl => '请输入有效的 URL';
+
+  @override
+  String get commandIsRequired => '命令为必填项';
+
+  @override
+  String skillRemoved(String name) {
+    return '技能\"$name\"已删除';
+  }
+
+  @override
+  String get editFileContentHint => '编辑文件内容...';
+
+  @override
+  String get whatsAppPairSubtitle => '使用二维码绑定您的个人 WhatsApp 账号';
+
+  @override
+  String get whatsAppPairingOptional => '绑定是可选的，您可以现在完成初始设置，稍后再完成绑定。';
+
+  @override
+  String get whatsAppEnableToLink => '启用 WhatsApp 以开始绑定此设备。';
+
+  @override
+  String get whatsAppLinkedOnboarding =>
+      'WhatsApp 已绑定。初始设置完成后 FlutterClaw 即可响应。';
+
+  @override
+  String get cancelLink => '取消绑定';
 }

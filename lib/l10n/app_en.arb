@@ -2349,5 +2349,152 @@
   "@addDeviceHint": { "description": "Add device tooltip for allowlist" },
 
   "skipAction": "Skip",
-  "@skipAction": { "description": "Skip button in dialog" }
+  "@skipAction": { "description": "Skip button in dialog" },
+
+  "speakMessage": "Speak",
+  "@speakMessage": { "description": "Context menu TTS action" },
+
+  "stopSpeaking": "Stop speaking",
+  "@stopSpeaking": { "description": "Context menu stop TTS action" },
+
+  "selectText": "Select Text",
+  "@selectText": { "description": "Context menu select text action" },
+
+  "messageCopied": "Message copied",
+  "@messageCopied": { "description": "Snackbar after copying a message" },
+
+  "mcpServers": "MCP Servers",
+  "@mcpServers": { "description": "MCP Servers screen title" },
+
+  "noMcpServersConfigured": "No MCP servers configured",
+  "@noMcpServersConfigured": { "description": "Empty state title for MCP servers list" },
+
+  "mcpServersEmptyHint": "Add MCP servers to give your agent access to tools from GitHub, Notion, Slack, databases, and more.",
+  "@mcpServersEmptyHint": { "description": "Empty state hint for MCP servers list" },
+
+  "addMcpServer": "Add MCP Server",
+  "@addMcpServer": { "description": "Button label to add an MCP server" },
+
+  "editMcpServer": "Edit MCP Server",
+  "@editMcpServer": { "description": "Screen title when editing an MCP server" },
+
+  "removeMcpServer": "Remove MCP Server",
+  "@removeMcpServer": { "description": "Dialog title to remove an MCP server" },
+
+  "removeMcpServerConfirm": "Remove \"{name}\"? Its tools will no longer be available.",
+  "@removeMcpServerConfirm": {
+    "description": "Confirmation message to remove an MCP server",
+    "placeholders": { "name": { "type": "String" } }
+  },
+
+  "mcpTransport": "Transport",
+  "@mcpTransport": { "description": "Label for MCP transport type selector" },
+
+  "testConnection": "Test Connection",
+  "@testConnection": { "description": "Button label to test MCP server connection" },
+
+  "mcpServerNameLabel": "Server name",
+  "@mcpServerNameLabel": { "description": "Label for MCP server name field" },
+
+  "mcpServerNameHint": "e.g. GitHub, Notion, My DB",
+  "@mcpServerNameHint": { "description": "Hint for MCP server name field" },
+
+  "mcpServerUrlLabel": "Server URL",
+  "@mcpServerUrlLabel": { "description": "Label for MCP server URL field" },
+
+  "mcpBearerTokenLabel": "Bearer token (optional)",
+  "@mcpBearerTokenLabel": { "description": "Label for MCP bearer token field" },
+
+  "mcpBearerTokenHint": "Leave blank if no auth required",
+  "@mcpBearerTokenHint": { "description": "Hint for MCP bearer token field" },
+
+  "mcpCommandLabel": "Command",
+  "@mcpCommandLabel": { "description": "Label for MCP stdio command field" },
+
+  "mcpArgumentsLabel": "Arguments (space-separated)",
+  "@mcpArgumentsLabel": { "description": "Label for MCP stdio arguments field" },
+
+  "mcpEnvVarsLabel": "Environment variables (KEY=VALUE, one per line)",
+  "@mcpEnvVarsLabel": { "description": "Label for MCP stdio env vars field" },
+
+  "mcpStdioNotOnIos": "stdio is not available on iOS. Use HTTP or SSE instead.",
+  "@mcpStdioNotOnIos": { "description": "Warning shown when stdio is selected on iOS" },
+
+  "connectedStatus": "Connected",
+  "@connectedStatus": { "description": "Generic connected status label" },
+
+  "mcpConnecting": "Connecting...",
+  "@mcpConnecting": { "description": "MCP server connecting status" },
+
+  "mcpConnectionError": "Connection error",
+  "@mcpConnectionError": { "description": "MCP server connection error status" },
+
+  "mcpDisconnected": "Disconnected",
+  "@mcpDisconnected": { "description": "MCP server disconnected status" },
+
+  "mcpToolsCount": "{count} tools",
+  "@mcpToolsCount": {
+    "description": "Number of tools discovered on an MCP server",
+    "placeholders": { "count": { "type": "int" } }
+  },
+
+  "mcpTestOkTools": "OK — {count} tools discovered",
+  "@mcpTestOkTools": {
+    "description": "MCP test connection success with tools",
+    "placeholders": { "count": { "type": "int" } }
+  },
+
+  "mcpTestOkNoTools": "OK — Connected (0 tools)",
+  "@mcpTestOkNoTools": { "description": "MCP test connection success with no tools" },
+
+  "mcpTestFailed": "Connection failed. Check server URL/token.",
+  "@mcpTestFailed": { "description": "MCP test connection failure message" },
+
+  "mcpAddServer": "Add server",
+  "@mcpAddServer": { "description": "Button label to add an MCP server in the editor" },
+
+  "mcpSaveChanges": "Save changes",
+  "@mcpSaveChanges": { "description": "Button label to save MCP server changes" },
+
+  "urlIsRequired": "URL is required",
+  "@urlIsRequired": { "description": "Validation error when URL is empty" },
+
+  "enterValidUrl": "Enter a valid URL",
+  "@enterValidUrl": { "description": "Validation error when URL is invalid" },
+
+  "commandIsRequired": "Command is required",
+  "@commandIsRequired": { "description": "Validation error when stdio command is empty" },
+
+  "nameIsRequired": "Name is required",
+  "@nameIsRequired": { "description": "Validation error when name is empty" },
+
+  "skillRemoved": "Skill \"{name}\" removed",
+  "@skillRemoved": {
+    "description": "Snackbar when a skill is removed",
+    "placeholders": { "name": { "type": "String" } }
+  },
+
+  "editFileContentHint": "Edit file content...",
+  "@editFileContentHint": { "description": "Hint text for file content editor" },
+
+  "whatsAppPairSubtitle": "Pair your personal WhatsApp account with a QR code",
+  "@whatsAppPairSubtitle": { "description": "Subtitle on WhatsApp toggle in channels page" },
+
+  "whatsAppPairingOptional": "Pairing is optional. You can finish onboarding now and complete the link later.",
+  "@whatsAppPairingOptional": { "description": "Info text on WhatsApp pairing during onboarding" },
+
+  "whatsAppEnableToLink": "Enable WhatsApp to start linking this device.",
+  "@whatsAppEnableToLink": { "description": "Idle description in WhatsApp pairing card" },
+
+  "whatsAppAcceptedQr": "WhatsApp accepted the QR. Finalizing the link...",
+  "@whatsAppAcceptedQr": { "description": "Connecting description when restart is pending" },
+
+  "waitingForWhatsApp": "Waiting for WhatsApp to complete the link...",
+  "@waitingForWhatsApp": { "description": "Connecting description in WhatsApp pairing card" },
+
+  "whatsAppLinkedOnboarding": "WhatsApp is linked. FlutterClaw will be able to respond after onboarding.",
+  "@whatsAppLinkedOnboarding": { "description": "Connected description in onboarding WhatsApp pairing card" },
+
+  "cancelLink": "Cancel Link",
+  "@cancelLink": { "description": "Button to cancel WhatsApp linking" }
 }

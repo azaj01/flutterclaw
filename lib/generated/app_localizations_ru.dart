@@ -1306,16 +1306,16 @@ class AppLocalizationsRu extends AppLocalizations {
   String get voiceInput => 'Голосовой ввод';
 
   @override
-  String get speakMessage => 'Speak';
+  String get speakMessage => 'Озвучить';
 
   @override
-  String get stopSpeaking => 'Stop speaking';
+  String get stopSpeaking => 'Остановить озвучку';
 
   @override
-  String get selectText => 'Select Text';
+  String get selectText => 'Выделить текст';
 
   @override
-  String get messageCopied => 'Message copied';
+  String get messageCopied => 'Сообщение скопировано';
 
   @override
   String get copyTooltip => 'Копировать';
@@ -1701,4 +1701,134 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get skipAction => 'Пропустить';
+
+  @override
+  String get mcpServers => 'MCP-серверы';
+
+  @override
+  String get noMcpServersConfigured => 'MCP-серверы не настроены';
+
+  @override
+  String get mcpServersEmptyHint =>
+      'Добавьте MCP-серверы, чтобы дать агенту доступ к инструментам GitHub, Notion, Slack, баз данных и других сервисов.';
+
+  @override
+  String get addMcpServer => 'Добавить MCP-сервер';
+
+  @override
+  String get editMcpServer => 'Редактировать MCP-сервер';
+
+  @override
+  String get removeMcpServer => 'Удалить MCP-сервер';
+
+  @override
+  String removeMcpServerConfirm(String name) {
+    return 'Удалить «$name»? Его инструменты станут недоступны.';
+  }
+
+  @override
+  String get mcpTransport => 'Транспорт';
+
+  @override
+  String get testConnection => 'Проверить соединение';
+
+  @override
+  String get mcpServerNameLabel => 'Имя сервера';
+
+  @override
+  String get mcpServerNameHint => 'напр. GitHub, Notion, Моя БД';
+
+  @override
+  String get mcpServerUrlLabel => 'URL сервера';
+
+  @override
+  String get mcpBearerTokenLabel => 'Bearer-токен (необязательно)';
+
+  @override
+  String get mcpBearerTokenHint => 'Оставьте пустым, если авторизация не нужна';
+
+  @override
+  String get mcpCommandLabel => 'Команда';
+
+  @override
+  String get mcpArgumentsLabel => 'Аргументы (через пробел)';
+
+  @override
+  String get mcpEnvVarsLabel =>
+      'Переменные окружения (КЛЮЧ=ЗНАЧЕНИЕ, по одной на строку)';
+
+  @override
+  String get mcpStdioNotOnIos =>
+      'stdio недоступен на iOS. Используйте HTTP или SSE.';
+
+  @override
+  String get connectedStatus => 'Подключено';
+
+  @override
+  String get mcpConnecting => 'Подключение...';
+
+  @override
+  String get mcpConnectionError => 'Ошибка подключения';
+
+  @override
+  String get mcpDisconnected => 'Отключено';
+
+  @override
+  String mcpToolsCount(int count) {
+    return '$count инструментов';
+  }
+
+  @override
+  String mcpTestOkTools(int count) {
+    return 'OK — обнаружено $count инструментов';
+  }
+
+  @override
+  String get mcpTestOkNoTools => 'OK — Подключено (0 инструментов)';
+
+  @override
+  String get mcpTestFailed =>
+      'Ошибка подключения. Проверьте URL/токен сервера.';
+
+  @override
+  String get mcpAddServer => 'Добавить сервер';
+
+  @override
+  String get mcpSaveChanges => 'Сохранить изменения';
+
+  @override
+  String get urlIsRequired => 'URL обязателен';
+
+  @override
+  String get enterValidUrl => 'Введите корректный URL';
+
+  @override
+  String get commandIsRequired => 'Команда обязательна';
+
+  @override
+  String skillRemoved(String name) {
+    return 'Навык «$name» удалён';
+  }
+
+  @override
+  String get editFileContentHint => 'Редактировать содержимое файла...';
+
+  @override
+  String get whatsAppPairSubtitle =>
+      'Привяжите личный аккаунт WhatsApp с помощью QR-кода';
+
+  @override
+  String get whatsAppPairingOptional =>
+      'Привязка необязательна. Вы можете завершить настройку сейчас и добавить привязку позже.';
+
+  @override
+  String get whatsAppEnableToLink =>
+      'Включите WhatsApp, чтобы начать привязку устройства.';
+
+  @override
+  String get whatsAppLinkedOnboarding =>
+      'WhatsApp привязан. FlutterClaw сможет отвечать после завершения настройки.';
+
+  @override
+  String get cancelLink => 'Отменить привязку';
 }

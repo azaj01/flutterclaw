@@ -1267,16 +1267,16 @@ class AppLocalizationsKo extends AppLocalizations {
   String get voiceInput => '음성 입력';
 
   @override
-  String get speakMessage => 'Speak';
+  String get speakMessage => '읽어주기';
 
   @override
-  String get stopSpeaking => 'Stop speaking';
+  String get stopSpeaking => '읽기 중지';
 
   @override
-  String get selectText => 'Select Text';
+  String get selectText => '텍스트 선택';
 
   @override
-  String get messageCopied => 'Message copied';
+  String get messageCopied => '메시지가 복사되었습니다';
 
   @override
   String get copyTooltip => '복사';
@@ -1622,4 +1622,129 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get skipAction => '건너뛰기';
+
+  @override
+  String get mcpServers => 'MCP 서버';
+
+  @override
+  String get noMcpServersConfigured => '구성된 MCP 서버가 없습니다';
+
+  @override
+  String get mcpServersEmptyHint =>
+      'MCP 서버를 추가하여 에이전트가 GitHub, Notion, Slack, 데이터베이스 등의 도구에 액세스할 수 있도록 하세요.';
+
+  @override
+  String get addMcpServer => 'MCP 서버 추가';
+
+  @override
+  String get editMcpServer => 'MCP 서버 편집';
+
+  @override
+  String get removeMcpServer => 'MCP 서버 제거';
+
+  @override
+  String removeMcpServerConfirm(String name) {
+    return '\"$name\"을(를) 제거하시겠습니까? 해당 도구를 더 이상 사용할 수 없습니다.';
+  }
+
+  @override
+  String get mcpTransport => '전송 방식';
+
+  @override
+  String get testConnection => '연결 테스트';
+
+  @override
+  String get mcpServerNameLabel => '서버 이름';
+
+  @override
+  String get mcpServerNameHint => '예: GitHub, Notion, 내 DB';
+
+  @override
+  String get mcpServerUrlLabel => '서버 URL';
+
+  @override
+  String get mcpBearerTokenLabel => 'Bearer 토큰 (선택사항)';
+
+  @override
+  String get mcpBearerTokenHint => '인증이 필요 없으면 비워두세요';
+
+  @override
+  String get mcpCommandLabel => '명령어';
+
+  @override
+  String get mcpArgumentsLabel => '인수 (공백으로 구분)';
+
+  @override
+  String get mcpEnvVarsLabel => '환경 변수 (키=값, 한 줄에 하나)';
+
+  @override
+  String get mcpStdioNotOnIos => 'stdio는 iOS에서 사용할 수 없습니다. HTTP 또는 SSE를 사용하세요.';
+
+  @override
+  String get connectedStatus => '연결됨';
+
+  @override
+  String get mcpConnecting => '연결 중...';
+
+  @override
+  String get mcpConnectionError => '연결 오류';
+
+  @override
+  String get mcpDisconnected => '연결 끊김';
+
+  @override
+  String mcpToolsCount(int count) {
+    return '도구 $count개';
+  }
+
+  @override
+  String mcpTestOkTools(int count) {
+    return '확인 — $count개의 도구 발견';
+  }
+
+  @override
+  String get mcpTestOkNoTools => '확인 — 연결됨 (도구 0개)';
+
+  @override
+  String get mcpTestFailed => '연결 실패. 서버 URL/토큰을 확인하세요.';
+
+  @override
+  String get mcpAddServer => '서버 추가';
+
+  @override
+  String get mcpSaveChanges => '변경사항 저장';
+
+  @override
+  String get urlIsRequired => 'URL이 필요합니다';
+
+  @override
+  String get enterValidUrl => '유효한 URL을 입력하세요';
+
+  @override
+  String get commandIsRequired => '명령어가 필요합니다';
+
+  @override
+  String skillRemoved(String name) {
+    return '스킬 \"$name\"이(가) 제거되었습니다';
+  }
+
+  @override
+  String get editFileContentHint => '파일 내용 편집...';
+
+  @override
+  String get whatsAppPairSubtitle => 'QR 코드로 개인 WhatsApp 계정 연결';
+
+  @override
+  String get whatsAppPairingOptional =>
+      '연결은 선택사항입니다. 지금 온보딩을 완료하고 나중에 연결할 수 있습니다.';
+
+  @override
+  String get whatsAppEnableToLink => 'WhatsApp을 활성화하여 이 기기 연결을 시작하세요.';
+
+  @override
+  String get whatsAppLinkedOnboarding =>
+      'WhatsApp이 연결되었습니다. 온보딩 후 FlutterClaw가 응답할 수 있습니다.';
+
+  @override
+  String get cancelLink => '연결 취소';
 }

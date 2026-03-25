@@ -1808,7 +1808,7 @@ abstract class AppLocalizations {
   /// **'Close'**
   String get close;
 
-  /// Name validation error
+  /// Validation error when name is empty
   ///
   /// In en, this message translates to:
   /// **'Name is required'**
@@ -2462,25 +2462,25 @@ abstract class AppLocalizations {
   /// **'Voice input'**
   String get voiceInput;
 
-  /// Context menu action: speak this message aloud
+  /// Context menu TTS action
   ///
   /// In en, this message translates to:
   /// **'Speak'**
   String get speakMessage;
 
-  /// Context menu action: stop current TTS playback
+  /// Context menu stop TTS action
   ///
   /// In en, this message translates to:
   /// **'Stop speaking'**
   String get stopSpeaking;
 
-  /// Context menu action: open text selection dialog
+  /// Context menu select text action
   ///
   /// In en, this message translates to:
   /// **'Select Text'**
   String get selectText;
 
-  /// Snackbar shown after copying a message
+  /// Snackbar after copying a message
   ///
   /// In en, this message translates to:
   /// **'Message copied'**
@@ -2762,13 +2762,13 @@ abstract class AppLocalizations {
   /// **'Tap \"Connect WhatsApp\" below to link your account.'**
   String get connectWhatsAppBelow;
 
-  /// WhatsApp restart pending message
+  /// Connecting description when restart is pending
   ///
   /// In en, this message translates to:
   /// **'WhatsApp accepted the QR. Finalizing the link...'**
   String get whatsAppAcceptedQr;
 
-  /// WhatsApp connecting message
+  /// Connecting description in WhatsApp pairing card
   ///
   /// In en, this message translates to:
   /// **'Waiting for WhatsApp to complete the link...'**
@@ -3085,6 +3085,234 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Skip'**
   String get skipAction;
+
+  /// MCP Servers screen title
+  ///
+  /// In en, this message translates to:
+  /// **'MCP Servers'**
+  String get mcpServers;
+
+  /// Empty state title for MCP servers list
+  ///
+  /// In en, this message translates to:
+  /// **'No MCP servers configured'**
+  String get noMcpServersConfigured;
+
+  /// Empty state hint for MCP servers list
+  ///
+  /// In en, this message translates to:
+  /// **'Add MCP servers to give your agent access to tools from GitHub, Notion, Slack, databases, and more.'**
+  String get mcpServersEmptyHint;
+
+  /// Button label to add an MCP server
+  ///
+  /// In en, this message translates to:
+  /// **'Add MCP Server'**
+  String get addMcpServer;
+
+  /// Screen title when editing an MCP server
+  ///
+  /// In en, this message translates to:
+  /// **'Edit MCP Server'**
+  String get editMcpServer;
+
+  /// Dialog title to remove an MCP server
+  ///
+  /// In en, this message translates to:
+  /// **'Remove MCP Server'**
+  String get removeMcpServer;
+
+  /// Confirmation message to remove an MCP server
+  ///
+  /// In en, this message translates to:
+  /// **'Remove \"{name}\"? Its tools will no longer be available.'**
+  String removeMcpServerConfirm(String name);
+
+  /// Label for MCP transport type selector
+  ///
+  /// In en, this message translates to:
+  /// **'Transport'**
+  String get mcpTransport;
+
+  /// Button label to test MCP server connection
+  ///
+  /// In en, this message translates to:
+  /// **'Test Connection'**
+  String get testConnection;
+
+  /// Label for MCP server name field
+  ///
+  /// In en, this message translates to:
+  /// **'Server name'**
+  String get mcpServerNameLabel;
+
+  /// Hint for MCP server name field
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. GitHub, Notion, My DB'**
+  String get mcpServerNameHint;
+
+  /// Label for MCP server URL field
+  ///
+  /// In en, this message translates to:
+  /// **'Server URL'**
+  String get mcpServerUrlLabel;
+
+  /// Label for MCP bearer token field
+  ///
+  /// In en, this message translates to:
+  /// **'Bearer token (optional)'**
+  String get mcpBearerTokenLabel;
+
+  /// Hint for MCP bearer token field
+  ///
+  /// In en, this message translates to:
+  /// **'Leave blank if no auth required'**
+  String get mcpBearerTokenHint;
+
+  /// Label for MCP stdio command field
+  ///
+  /// In en, this message translates to:
+  /// **'Command'**
+  String get mcpCommandLabel;
+
+  /// Label for MCP stdio arguments field
+  ///
+  /// In en, this message translates to:
+  /// **'Arguments (space-separated)'**
+  String get mcpArgumentsLabel;
+
+  /// Label for MCP stdio env vars field
+  ///
+  /// In en, this message translates to:
+  /// **'Environment variables (KEY=VALUE, one per line)'**
+  String get mcpEnvVarsLabel;
+
+  /// Warning shown when stdio is selected on iOS
+  ///
+  /// In en, this message translates to:
+  /// **'stdio is not available on iOS. Use HTTP or SSE instead.'**
+  String get mcpStdioNotOnIos;
+
+  /// Generic connected status label
+  ///
+  /// In en, this message translates to:
+  /// **'Connected'**
+  String get connectedStatus;
+
+  /// MCP server connecting status
+  ///
+  /// In en, this message translates to:
+  /// **'Connecting...'**
+  String get mcpConnecting;
+
+  /// MCP server connection error status
+  ///
+  /// In en, this message translates to:
+  /// **'Connection error'**
+  String get mcpConnectionError;
+
+  /// MCP server disconnected status
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnected'**
+  String get mcpDisconnected;
+
+  /// Number of tools discovered on an MCP server
+  ///
+  /// In en, this message translates to:
+  /// **'{count} tools'**
+  String mcpToolsCount(int count);
+
+  /// MCP test connection success with tools
+  ///
+  /// In en, this message translates to:
+  /// **'OK — {count} tools discovered'**
+  String mcpTestOkTools(int count);
+
+  /// MCP test connection success with no tools
+  ///
+  /// In en, this message translates to:
+  /// **'OK — Connected (0 tools)'**
+  String get mcpTestOkNoTools;
+
+  /// MCP test connection failure message
+  ///
+  /// In en, this message translates to:
+  /// **'Connection failed. Check server URL/token.'**
+  String get mcpTestFailed;
+
+  /// Button label to add an MCP server in the editor
+  ///
+  /// In en, this message translates to:
+  /// **'Add server'**
+  String get mcpAddServer;
+
+  /// Button label to save MCP server changes
+  ///
+  /// In en, this message translates to:
+  /// **'Save changes'**
+  String get mcpSaveChanges;
+
+  /// Validation error when URL is empty
+  ///
+  /// In en, this message translates to:
+  /// **'URL is required'**
+  String get urlIsRequired;
+
+  /// Validation error when URL is invalid
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid URL'**
+  String get enterValidUrl;
+
+  /// Validation error when stdio command is empty
+  ///
+  /// In en, this message translates to:
+  /// **'Command is required'**
+  String get commandIsRequired;
+
+  /// Snackbar when a skill is removed
+  ///
+  /// In en, this message translates to:
+  /// **'Skill \"{name}\" removed'**
+  String skillRemoved(String name);
+
+  /// Hint text for file content editor
+  ///
+  /// In en, this message translates to:
+  /// **'Edit file content...'**
+  String get editFileContentHint;
+
+  /// Subtitle on WhatsApp toggle in channels page
+  ///
+  /// In en, this message translates to:
+  /// **'Pair your personal WhatsApp account with a QR code'**
+  String get whatsAppPairSubtitle;
+
+  /// Info text on WhatsApp pairing during onboarding
+  ///
+  /// In en, this message translates to:
+  /// **'Pairing is optional. You can finish onboarding now and complete the link later.'**
+  String get whatsAppPairingOptional;
+
+  /// Idle description in WhatsApp pairing card
+  ///
+  /// In en, this message translates to:
+  /// **'Enable WhatsApp to start linking this device.'**
+  String get whatsAppEnableToLink;
+
+  /// Connected description in onboarding WhatsApp pairing card
+  ///
+  /// In en, this message translates to:
+  /// **'WhatsApp is linked. FlutterClaw will be able to respond after onboarding.'**
+  String get whatsAppLinkedOnboarding;
+
+  /// Button to cancel WhatsApp linking
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel Link'**
+  String get cancelLink;
 }
 
 class _AppLocalizationsDelegate

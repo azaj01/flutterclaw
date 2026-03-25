@@ -1285,16 +1285,16 @@ class AppLocalizationsTh extends AppLocalizations {
   String get voiceInput => 'อินพุตเสียง';
 
   @override
-  String get speakMessage => 'Speak';
+  String get speakMessage => 'อ่านออกเสียง';
 
   @override
-  String get stopSpeaking => 'Stop speaking';
+  String get stopSpeaking => 'หยุดอ่าน';
 
   @override
-  String get selectText => 'Select Text';
+  String get selectText => 'เลือกข้อความ';
 
   @override
-  String get messageCopied => 'Message copied';
+  String get messageCopied => 'คัดลอกข้อความแล้ว';
 
   @override
   String get copyTooltip => 'คัดลอก';
@@ -1667,4 +1667,132 @@ class AppLocalizationsTh extends AppLocalizations {
 
   @override
   String get skipAction => 'ข้าม';
+
+  @override
+  String get mcpServers => 'เซิร์ฟเวอร์ MCP';
+
+  @override
+  String get noMcpServersConfigured => 'ยังไม่มีการกำหนดค่าเซิร์ฟเวอร์ MCP';
+
+  @override
+  String get mcpServersEmptyHint =>
+      'เพิ่มเซิร์ฟเวอร์ MCP เพื่อให้เอเจนต์เข้าถึงเครื่องมือจาก GitHub, Notion, Slack, ฐานข้อมูล และอื่นๆ';
+
+  @override
+  String get addMcpServer => 'เพิ่มเซิร์ฟเวอร์ MCP';
+
+  @override
+  String get editMcpServer => 'แก้ไขเซิร์ฟเวอร์ MCP';
+
+  @override
+  String get removeMcpServer => 'ลบเซิร์ฟเวอร์ MCP';
+
+  @override
+  String removeMcpServerConfirm(String name) {
+    return 'ลบ \"$name\" หรือไม่? เครื่องมือจะไม่สามารถใช้งานได้อีก';
+  }
+
+  @override
+  String get mcpTransport => 'การขนส่ง';
+
+  @override
+  String get testConnection => 'ทดสอบการเชื่อมต่อ';
+
+  @override
+  String get mcpServerNameLabel => 'ชื่อเซิร์ฟเวอร์';
+
+  @override
+  String get mcpServerNameHint => 'เช่น GitHub, Notion, ฐานข้อมูลของฉัน';
+
+  @override
+  String get mcpServerUrlLabel => 'URL เซิร์ฟเวอร์';
+
+  @override
+  String get mcpBearerTokenLabel => 'Bearer Token (ไม่บังคับ)';
+
+  @override
+  String get mcpBearerTokenHint => 'เว้นว่างหากไม่ต้องการการยืนยันตัวตน';
+
+  @override
+  String get mcpCommandLabel => 'คำสั่ง';
+
+  @override
+  String get mcpArgumentsLabel => 'อาร์กิวเมนต์ (คั่นด้วยช่องว่าง)';
+
+  @override
+  String get mcpEnvVarsLabel =>
+      'ตัวแปรสภาพแวดล้อม (KEY=VALUE หนึ่งบรรทัดต่อหนึ่งรายการ)';
+
+  @override
+  String get mcpStdioNotOnIos => 'stdio ไม่รองรับบน iOS ใช้ HTTP หรือ SSE แทน';
+
+  @override
+  String get connectedStatus => 'เชื่อมต่อแล้ว';
+
+  @override
+  String get mcpConnecting => 'กำลังเชื่อมต่อ...';
+
+  @override
+  String get mcpConnectionError => 'ข้อผิดพลาดในการเชื่อมต่อ';
+
+  @override
+  String get mcpDisconnected => 'ตัดการเชื่อมต่อแล้ว';
+
+  @override
+  String mcpToolsCount(int count) {
+    return '$count เครื่องมือ';
+  }
+
+  @override
+  String mcpTestOkTools(int count) {
+    return 'สำเร็จ — พบ $count เครื่องมือ';
+  }
+
+  @override
+  String get mcpTestOkNoTools => 'สำเร็จ — เชื่อมต่อแล้ว (0 เครื่องมือ)';
+
+  @override
+  String get mcpTestFailed =>
+      'การเชื่อมต่อล้มเหลว ตรวจสอบ URL/token ของเซิร์ฟเวอร์';
+
+  @override
+  String get mcpAddServer => 'เพิ่มเซิร์ฟเวอร์';
+
+  @override
+  String get mcpSaveChanges => 'บันทึกการเปลี่ยนแปลง';
+
+  @override
+  String get urlIsRequired => 'จำเป็นต้องระบุ URL';
+
+  @override
+  String get enterValidUrl => 'กรุณากรอก URL ที่ถูกต้อง';
+
+  @override
+  String get commandIsRequired => 'จำเป็นต้องระบุคำสั่ง';
+
+  @override
+  String skillRemoved(String name) {
+    return 'ลบทักษะ \"$name\" แล้ว';
+  }
+
+  @override
+  String get editFileContentHint => 'แก้ไขเนื้อหาไฟล์...';
+
+  @override
+  String get whatsAppPairSubtitle => 'จับคู่บัญชี WhatsApp ส่วนตัวด้วย QR Code';
+
+  @override
+  String get whatsAppPairingOptional =>
+      'การจับคู่เป็นทางเลือก คุณสามารถเสร็จสิ้นการตั้งค่าตอนนี้และเชื่อมต่อภายหลังได้';
+
+  @override
+  String get whatsAppEnableToLink =>
+      'เปิดใช้งาน WhatsApp เพื่อเริ่มเชื่อมต่ออุปกรณ์นี้';
+
+  @override
+  String get whatsAppLinkedOnboarding =>
+      'เชื่อมต่อ WhatsApp แล้ว FlutterClaw จะสามารถตอบกลับได้หลังการตั้งค่า';
+
+  @override
+  String get cancelLink => 'ยกเลิกการเชื่อมต่อ';
 }

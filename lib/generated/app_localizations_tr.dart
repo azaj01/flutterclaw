@@ -1311,16 +1311,16 @@ class AppLocalizationsTr extends AppLocalizations {
   String get voiceInput => 'Sesli giriş';
 
   @override
-  String get speakMessage => 'Speak';
+  String get speakMessage => 'Sesli oku';
 
   @override
-  String get stopSpeaking => 'Stop speaking';
+  String get stopSpeaking => 'Okumayı durdur';
 
   @override
-  String get selectText => 'Select Text';
+  String get selectText => 'Metin seç';
 
   @override
-  String get messageCopied => 'Message copied';
+  String get messageCopied => 'Mesaj kopyalandı';
 
   @override
   String get copyTooltip => 'Kopyala';
@@ -1698,4 +1698,134 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get skipAction => 'Atla';
+
+  @override
+  String get mcpServers => 'MCP Sunucuları';
+
+  @override
+  String get noMcpServersConfigured => 'Yapılandırılmış MCP sunucusu yok';
+
+  @override
+  String get mcpServersEmptyHint =>
+      'Ajanınıza GitHub, Notion, Slack, veritabanları ve daha fazlasından araçlara erişim sağlamak için MCP sunucuları ekleyin.';
+
+  @override
+  String get addMcpServer => 'MCP Sunucusu Ekle';
+
+  @override
+  String get editMcpServer => 'MCP Sunucusunu Düzenle';
+
+  @override
+  String get removeMcpServer => 'MCP Sunucusunu Kaldır';
+
+  @override
+  String removeMcpServerConfirm(String name) {
+    return '\"$name\" kaldırılsın mı? Araçları artık kullanılamayacak.';
+  }
+
+  @override
+  String get mcpTransport => 'Aktarım';
+
+  @override
+  String get testConnection => 'Bağlantıyı Test Et';
+
+  @override
+  String get mcpServerNameLabel => 'Sunucu adı';
+
+  @override
+  String get mcpServerNameHint => 'örn. GitHub, Notion, Veritabanım';
+
+  @override
+  String get mcpServerUrlLabel => 'Sunucu URL\'si';
+
+  @override
+  String get mcpBearerTokenLabel => 'Bearer Token (isteğe bağlı)';
+
+  @override
+  String get mcpBearerTokenHint => 'Kimlik doğrulama gerekmiyorsa boş bırakın';
+
+  @override
+  String get mcpCommandLabel => 'Komut';
+
+  @override
+  String get mcpArgumentsLabel => 'Argümanlar (boşlukla ayrılmış)';
+
+  @override
+  String get mcpEnvVarsLabel =>
+      'Ortam değişkenleri (ANAHTAR=DEĞER, her satıra bir tane)';
+
+  @override
+  String get mcpStdioNotOnIos =>
+      'stdio iOS\'ta kullanılamaz. HTTP veya SSE kullanın.';
+
+  @override
+  String get connectedStatus => 'Bağlandı';
+
+  @override
+  String get mcpConnecting => 'Bağlanıyor...';
+
+  @override
+  String get mcpConnectionError => 'Bağlantı hatası';
+
+  @override
+  String get mcpDisconnected => 'Bağlantı kesildi';
+
+  @override
+  String mcpToolsCount(int count) {
+    return '$count araç';
+  }
+
+  @override
+  String mcpTestOkTools(int count) {
+    return 'Tamam — $count araç bulundu';
+  }
+
+  @override
+  String get mcpTestOkNoTools => 'Tamam — Bağlandı (0 araç)';
+
+  @override
+  String get mcpTestFailed =>
+      'Bağlantı başarısız. Sunucu URL/token\'ını kontrol edin.';
+
+  @override
+  String get mcpAddServer => 'Sunucu ekle';
+
+  @override
+  String get mcpSaveChanges => 'Değişiklikleri kaydet';
+
+  @override
+  String get urlIsRequired => 'URL zorunludur';
+
+  @override
+  String get enterValidUrl => 'Geçerli bir URL girin';
+
+  @override
+  String get commandIsRequired => 'Komut zorunludur';
+
+  @override
+  String skillRemoved(String name) {
+    return '\"$name\" becerisi kaldırıldı';
+  }
+
+  @override
+  String get editFileContentHint => 'Dosya içeriğini düzenle...';
+
+  @override
+  String get whatsAppPairSubtitle =>
+      'Kişisel WhatsApp hesabınızı QR koduyla eşleştirin';
+
+  @override
+  String get whatsAppPairingOptional =>
+      'Eşleştirme isteğe bağlıdır. Şimdi kurulumu tamamlayıp bağlantıyı daha sonra kurabilirsiniz.';
+
+  @override
+  String get whatsAppEnableToLink =>
+      'Bu cihazı bağlamaya başlamak için WhatsApp\'ı etkinleştirin.';
+
+  @override
+  String get whatsAppLinkedOnboarding =>
+      'WhatsApp bağlandı. FlutterClaw kurulum sonrasında yanıt verebilecek.';
+
+  @override
+  String get cancelLink => 'Bağlantıyı iptal et';
 }

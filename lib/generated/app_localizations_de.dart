@@ -1319,16 +1319,16 @@ class AppLocalizationsDe extends AppLocalizations {
   String get voiceInput => 'Spracheingabe';
 
   @override
-  String get speakMessage => 'Speak';
+  String get speakMessage => 'Vorlesen';
 
   @override
-  String get stopSpeaking => 'Stop speaking';
+  String get stopSpeaking => 'Vorlesen stoppen';
 
   @override
-  String get selectText => 'Select Text';
+  String get selectText => 'Text auswählen';
 
   @override
-  String get messageCopied => 'Message copied';
+  String get messageCopied => 'Nachricht kopiert';
 
   @override
   String get copyTooltip => 'Kopieren';
@@ -1708,4 +1708,135 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get skipAction => 'Überspringen';
+
+  @override
+  String get mcpServers => 'MCP-Server';
+
+  @override
+  String get noMcpServersConfigured => 'Keine MCP-Server konfiguriert';
+
+  @override
+  String get mcpServersEmptyHint =>
+      'Fügen Sie MCP-Server hinzu, um Ihrem Agenten Zugriff auf Tools von GitHub, Notion, Slack, Datenbanken und mehr zu geben.';
+
+  @override
+  String get addMcpServer => 'MCP-Server hinzufügen';
+
+  @override
+  String get editMcpServer => 'MCP-Server bearbeiten';
+
+  @override
+  String get removeMcpServer => 'MCP-Server entfernen';
+
+  @override
+  String removeMcpServerConfirm(String name) {
+    return '\"$name\" entfernen? Seine Tools sind dann nicht mehr verfügbar.';
+  }
+
+  @override
+  String get mcpTransport => 'Transport';
+
+  @override
+  String get testConnection => 'Verbindung testen';
+
+  @override
+  String get mcpServerNameLabel => 'Servername';
+
+  @override
+  String get mcpServerNameHint => 'z.B. GitHub, Notion, Meine DB';
+
+  @override
+  String get mcpServerUrlLabel => 'Server-URL';
+
+  @override
+  String get mcpBearerTokenLabel => 'Bearer-Token (optional)';
+
+  @override
+  String get mcpBearerTokenHint =>
+      'Leer lassen, wenn keine Authentifizierung erforderlich';
+
+  @override
+  String get mcpCommandLabel => 'Befehl';
+
+  @override
+  String get mcpArgumentsLabel => 'Argumente (durch Leerzeichen getrennt)';
+
+  @override
+  String get mcpEnvVarsLabel =>
+      'Umgebungsvariablen (SCHLÜSSEL=WERT, eine pro Zeile)';
+
+  @override
+  String get mcpStdioNotOnIos =>
+      'stdio ist auf iOS nicht verfügbar. Verwende HTTP oder SSE.';
+
+  @override
+  String get connectedStatus => 'Verbunden';
+
+  @override
+  String get mcpConnecting => 'Verbinde...';
+
+  @override
+  String get mcpConnectionError => 'Verbindungsfehler';
+
+  @override
+  String get mcpDisconnected => 'Getrennt';
+
+  @override
+  String mcpToolsCount(int count) {
+    return '$count Tools';
+  }
+
+  @override
+  String mcpTestOkTools(int count) {
+    return 'OK — $count Tools entdeckt';
+  }
+
+  @override
+  String get mcpTestOkNoTools => 'OK — Verbunden (0 Tools)';
+
+  @override
+  String get mcpTestFailed =>
+      'Verbindung fehlgeschlagen. Server-URL/Token prüfen.';
+
+  @override
+  String get mcpAddServer => 'Server hinzufügen';
+
+  @override
+  String get mcpSaveChanges => 'Änderungen speichern';
+
+  @override
+  String get urlIsRequired => 'URL ist erforderlich';
+
+  @override
+  String get enterValidUrl => 'Gültige URL eingeben';
+
+  @override
+  String get commandIsRequired => 'Befehl ist erforderlich';
+
+  @override
+  String skillRemoved(String name) {
+    return 'Skill \"$name\" entfernt';
+  }
+
+  @override
+  String get editFileContentHint => 'Dateiinhalt bearbeiten...';
+
+  @override
+  String get whatsAppPairSubtitle =>
+      'Verknüpfen Sie Ihr persönliches WhatsApp-Konto mit einem QR-Code';
+
+  @override
+  String get whatsAppPairingOptional =>
+      'Die Verknüpfung ist optional. Sie können den Prozess jetzt abschließen und den Link später vervollständigen.';
+
+  @override
+  String get whatsAppEnableToLink =>
+      'WhatsApp aktivieren, um dieses Gerät zu verknüpfen.';
+
+  @override
+  String get whatsAppLinkedOnboarding =>
+      'WhatsApp ist verknüpft. FlutterClaw kann nach dem Onboarding antworten.';
+
+  @override
+  String get cancelLink => 'Link abbrechen';
 }

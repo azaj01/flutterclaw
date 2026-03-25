@@ -150,7 +150,7 @@ class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
                                 .read(gatewayStateProvider.notifier)
                                 .setModel(config.activeAgent?.modelName ?? config.agents.defaults.modelName);
                           },
-                          child: Text('Retry'),
+                          child: Text(context.l10n.retry),
                         )
                       else
                         FilledButton.tonal(
@@ -171,7 +171,7 @@ class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
                                           context,
                                         ).showSnackBar(
                                           SnackBar(
-                                            content: Text('Gateway stopped'),
+                                            content: Text(context.l10n.gatewayStopped),
                                           ),
                                         );
                                       }
@@ -203,7 +203,7 @@ class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
                                             ).showSnackBar(
                                               SnackBar(
                                                 content: Text(
-                                                  'Gateway failed: ${IosGatewayService.lastError}',
+                                                  context.l10n.gatewayFailed(IosGatewayService.lastError ?? ''),
                                                 ),
                                                 backgroundColor: Colors.red,
                                                 duration: Duration(seconds: 5),
@@ -217,7 +217,7 @@ class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
                                             ).showSnackBar(
                                               SnackBar(
                                                 content: Text(
-                                                  'Gateway started successfully!',
+                                                  context.l10n.gatewayStarted,
                                                 ),
                                               ),
                                             );
@@ -248,7 +248,7 @@ class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
                                         context,
                                       ).showSnackBar(
                                         SnackBar(
-                                          content: Text('Exception: $e'),
+                                          content: Text(context.l10n.exceptionError(e.toString())),
                                           backgroundColor: Colors.red,
                                           duration: Duration(seconds: 5),
                                         ),

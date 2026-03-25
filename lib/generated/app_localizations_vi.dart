@@ -1298,16 +1298,16 @@ class AppLocalizationsVi extends AppLocalizations {
   String get voiceInput => 'Nhập giọng nói';
 
   @override
-  String get speakMessage => 'Speak';
+  String get speakMessage => 'Đọc to';
 
   @override
-  String get stopSpeaking => 'Stop speaking';
+  String get stopSpeaking => 'Dừng đọc';
 
   @override
-  String get selectText => 'Select Text';
+  String get selectText => 'Chọn văn bản';
 
   @override
-  String get messageCopied => 'Message copied';
+  String get messageCopied => 'Đã sao chép tin nhắn';
 
   @override
   String get copyTooltip => 'Sao chép';
@@ -1673,4 +1673,133 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get skipAction => 'Bỏ qua';
+
+  @override
+  String get mcpServers => 'Máy chủ MCP';
+
+  @override
+  String get noMcpServersConfigured => 'Chưa có máy chủ MCP nào được cấu hình';
+
+  @override
+  String get mcpServersEmptyHint =>
+      'Thêm máy chủ MCP để cho phép trợ lý truy cập các công cụ từ GitHub, Notion, Slack, cơ sở dữ liệu và nhiều hơn nữa.';
+
+  @override
+  String get addMcpServer => 'Thêm máy chủ MCP';
+
+  @override
+  String get editMcpServer => 'Chỉnh sửa máy chủ MCP';
+
+  @override
+  String get removeMcpServer => 'Xóa máy chủ MCP';
+
+  @override
+  String removeMcpServerConfirm(String name) {
+    return 'Xóa \"$name\"? Các công cụ của nó sẽ không còn khả dụng.';
+  }
+
+  @override
+  String get mcpTransport => 'Giao thức';
+
+  @override
+  String get testConnection => 'Kiểm tra kết nối';
+
+  @override
+  String get mcpServerNameLabel => 'Tên máy chủ';
+
+  @override
+  String get mcpServerNameHint => 'vd. GitHub, Notion, CSDL của tôi';
+
+  @override
+  String get mcpServerUrlLabel => 'URL máy chủ';
+
+  @override
+  String get mcpBearerTokenLabel => 'Bearer Token (tùy chọn)';
+
+  @override
+  String get mcpBearerTokenHint => 'Để trống nếu không cần xác thực';
+
+  @override
+  String get mcpCommandLabel => 'Lệnh';
+
+  @override
+  String get mcpArgumentsLabel => 'Tham số (cách nhau bằng dấu cách)';
+
+  @override
+  String get mcpEnvVarsLabel =>
+      'Biến môi trường (KHÓA=GIÁ_TRỊ, mỗi dòng một cái)';
+
+  @override
+  String get mcpStdioNotOnIos =>
+      'stdio không khả dụng trên iOS. Sử dụng HTTP hoặc SSE.';
+
+  @override
+  String get connectedStatus => 'Đã kết nối';
+
+  @override
+  String get mcpConnecting => 'Đang kết nối...';
+
+  @override
+  String get mcpConnectionError => 'Lỗi kết nối';
+
+  @override
+  String get mcpDisconnected => 'Đã ngắt kết nối';
+
+  @override
+  String mcpToolsCount(int count) {
+    return '$count công cụ';
+  }
+
+  @override
+  String mcpTestOkTools(int count) {
+    return 'OK — Phát hiện $count công cụ';
+  }
+
+  @override
+  String get mcpTestOkNoTools => 'OK — Đã kết nối (0 công cụ)';
+
+  @override
+  String get mcpTestFailed => 'Kết nối thất bại. Kiểm tra URL/token máy chủ.';
+
+  @override
+  String get mcpAddServer => 'Thêm máy chủ';
+
+  @override
+  String get mcpSaveChanges => 'Lưu thay đổi';
+
+  @override
+  String get urlIsRequired => 'URL là bắt buộc';
+
+  @override
+  String get enterValidUrl => 'Nhập URL hợp lệ';
+
+  @override
+  String get commandIsRequired => 'Lệnh là bắt buộc';
+
+  @override
+  String skillRemoved(String name) {
+    return 'Đã xóa kỹ năng \"$name\"';
+  }
+
+  @override
+  String get editFileContentHint => 'Chỉnh sửa nội dung tệp...';
+
+  @override
+  String get whatsAppPairSubtitle =>
+      'Ghép nối tài khoản WhatsApp cá nhân bằng mã QR';
+
+  @override
+  String get whatsAppPairingOptional =>
+      'Ghép nối là tùy chọn. Bạn có thể hoàn tất thiết lập ngay bây giờ và kết nối sau.';
+
+  @override
+  String get whatsAppEnableToLink =>
+      'Bật WhatsApp để bắt đầu liên kết thiết bị này.';
+
+  @override
+  String get whatsAppLinkedOnboarding =>
+      'WhatsApp đã được liên kết. FlutterClaw có thể phản hồi sau khi hoàn tất thiết lập.';
+
+  @override
+  String get cancelLink => 'Hủy liên kết';
 }

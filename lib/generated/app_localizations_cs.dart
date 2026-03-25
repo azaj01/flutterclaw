@@ -1303,16 +1303,16 @@ class AppLocalizationsCs extends AppLocalizations {
   String get voiceInput => 'Hlasový vstup';
 
   @override
-  String get speakMessage => 'Speak';
+  String get speakMessage => 'Přečíst nahlas';
 
   @override
-  String get stopSpeaking => 'Stop speaking';
+  String get stopSpeaking => 'Zastavit čtení';
 
   @override
-  String get selectText => 'Select Text';
+  String get selectText => 'Vybrat text';
 
   @override
-  String get messageCopied => 'Message copied';
+  String get messageCopied => 'Zpráva zkopírována';
 
   @override
   String get copyTooltip => 'Kopírovat';
@@ -1692,4 +1692,136 @@ class AppLocalizationsCs extends AppLocalizations {
 
   @override
   String get skipAction => 'Přeskočit';
+
+  @override
+  String get mcpServers => 'MCP servery';
+
+  @override
+  String get noMcpServersConfigured =>
+      'Žádné MCP servery nejsou nakonfigurovány';
+
+  @override
+  String get mcpServersEmptyHint =>
+      'Přidejte MCP servery, abyste svému agentovi umožnili přístup k nástrojům z GitHubu, Notionu, Slacku, databází a dalších.';
+
+  @override
+  String get addMcpServer => 'Přidat MCP server';
+
+  @override
+  String get editMcpServer => 'Upravit MCP server';
+
+  @override
+  String get removeMcpServer => 'Odstranit MCP server';
+
+  @override
+  String removeMcpServerConfirm(String name) {
+    return 'Odstranit \"$name\"? Jeho nástroje již nebudou dostupné.';
+  }
+
+  @override
+  String get mcpTransport => 'Přenos';
+
+  @override
+  String get testConnection => 'Otestovat připojení';
+
+  @override
+  String get mcpServerNameLabel => 'Název serveru';
+
+  @override
+  String get mcpServerNameHint => 'např. GitHub, Notion, Moje DB';
+
+  @override
+  String get mcpServerUrlLabel => 'URL serveru';
+
+  @override
+  String get mcpBearerTokenLabel => 'Bearer token (volitelné)';
+
+  @override
+  String get mcpBearerTokenHint =>
+      'Nechte prázdné, pokud autentizace není vyžadována';
+
+  @override
+  String get mcpCommandLabel => 'Příkaz';
+
+  @override
+  String get mcpArgumentsLabel => 'Argumenty (oddělené mezerami)';
+
+  @override
+  String get mcpEnvVarsLabel =>
+      'Proměnné prostředí (KLÍČ=HODNOTA, jeden na řádek)';
+
+  @override
+  String get mcpStdioNotOnIos =>
+      'stdio není na iOS k dispozici. Použijte HTTP nebo SSE.';
+
+  @override
+  String get connectedStatus => 'Připojeno';
+
+  @override
+  String get mcpConnecting => 'Připojování...';
+
+  @override
+  String get mcpConnectionError => 'Chyba připojení';
+
+  @override
+  String get mcpDisconnected => 'Odpojeno';
+
+  @override
+  String mcpToolsCount(int count) {
+    return '$count nástrojů';
+  }
+
+  @override
+  String mcpTestOkTools(int count) {
+    return 'OK — nalezeno $count nástrojů';
+  }
+
+  @override
+  String get mcpTestOkNoTools => 'OK — Připojeno (0 nástrojů)';
+
+  @override
+  String get mcpTestFailed =>
+      'Připojení selhalo. Zkontrolujte URL/token serveru.';
+
+  @override
+  String get mcpAddServer => 'Přidat server';
+
+  @override
+  String get mcpSaveChanges => 'Uložit změny';
+
+  @override
+  String get urlIsRequired => 'URL je povinná';
+
+  @override
+  String get enterValidUrl => 'Zadejte platnou URL';
+
+  @override
+  String get commandIsRequired => 'Příkaz je povinný';
+
+  @override
+  String skillRemoved(String name) {
+    return 'Dovednost \"$name\" odebrána';
+  }
+
+  @override
+  String get editFileContentHint => 'Upravit obsah souboru...';
+
+  @override
+  String get whatsAppPairSubtitle =>
+      'Propojte svůj osobní účet WhatsApp pomocí QR kódu';
+
+  @override
+  String get whatsAppPairingOptional =>
+      'Párování je volitelné. Můžete dokončit onboarding nyní a odkaz přidat později.';
+
+  @override
+  String get whatsAppEnableToLink =>
+      'Zapněte WhatsApp a začněte propojovat toto zařízení.';
+
+  @override
+  String get whatsAppLinkedOnboarding =>
+      'WhatsApp je propojen. FlutterClaw bude moci odpovídat po dokončení onboardingu.';
+
+  @override
+  String get cancelLink => 'Zrušit propojení';
 }

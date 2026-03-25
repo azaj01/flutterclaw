@@ -70,7 +70,7 @@ class _SignalConfigScreenState extends ConsumerState<SignalConfigScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Error: $e')));
+          .showSnackBar(SnackBar(content: Text(context.l10n.errorGeneric(e.toString()))));
     } finally {
       if (mounted) setState(() => _saving = false);
     }

@@ -1306,16 +1306,16 @@ class AppLocalizationsId extends AppLocalizations {
   String get voiceInput => 'Input suara';
 
   @override
-  String get speakMessage => 'Speak';
+  String get speakMessage => 'Bacakan';
 
   @override
-  String get stopSpeaking => 'Stop speaking';
+  String get stopSpeaking => 'Hentikan pembacaan';
 
   @override
-  String get selectText => 'Select Text';
+  String get selectText => 'Pilih teks';
 
   @override
-  String get messageCopied => 'Message copied';
+  String get messageCopied => 'Pesan disalin';
 
   @override
   String get copyTooltip => 'Salin';
@@ -1682,4 +1682,135 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get skipAction => 'Lewati';
+
+  @override
+  String get mcpServers => 'Server MCP';
+
+  @override
+  String get noMcpServersConfigured =>
+      'Tidak ada server MCP yang dikonfigurasi';
+
+  @override
+  String get mcpServersEmptyHint =>
+      'Tambahkan server MCP agar agen Anda dapat mengakses alat dari GitHub, Notion, Slack, basis data, dan lainnya.';
+
+  @override
+  String get addMcpServer => 'Tambah Server MCP';
+
+  @override
+  String get editMcpServer => 'Edit Server MCP';
+
+  @override
+  String get removeMcpServer => 'Hapus Server MCP';
+
+  @override
+  String removeMcpServerConfirm(String name) {
+    return 'Hapus \"$name\"? Alat-alatnya tidak akan tersedia lagi.';
+  }
+
+  @override
+  String get mcpTransport => 'Transportasi';
+
+  @override
+  String get testConnection => 'Uji Koneksi';
+
+  @override
+  String get mcpServerNameLabel => 'Nama server';
+
+  @override
+  String get mcpServerNameHint => 'mis. GitHub, Notion, DB Saya';
+
+  @override
+  String get mcpServerUrlLabel => 'URL server';
+
+  @override
+  String get mcpBearerTokenLabel => 'Token Bearer (opsional)';
+
+  @override
+  String get mcpBearerTokenHint =>
+      'Biarkan kosong jika tidak perlu autentikasi';
+
+  @override
+  String get mcpCommandLabel => 'Perintah';
+
+  @override
+  String get mcpArgumentsLabel => 'Argumen (dipisahkan spasi)';
+
+  @override
+  String get mcpEnvVarsLabel =>
+      'Variabel lingkungan (KUNCI=NILAI, satu per baris)';
+
+  @override
+  String get mcpStdioNotOnIos =>
+      'stdio tidak tersedia di iOS. Gunakan HTTP atau SSE.';
+
+  @override
+  String get connectedStatus => 'Terhubung';
+
+  @override
+  String get mcpConnecting => 'Menghubungkan...';
+
+  @override
+  String get mcpConnectionError => 'Kesalahan koneksi';
+
+  @override
+  String get mcpDisconnected => 'Terputus';
+
+  @override
+  String mcpToolsCount(int count) {
+    return '$count alat';
+  }
+
+  @override
+  String mcpTestOkTools(int count) {
+    return 'OK — $count alat ditemukan';
+  }
+
+  @override
+  String get mcpTestOkNoTools => 'OK — Terhubung (0 alat)';
+
+  @override
+  String get mcpTestFailed => 'Koneksi gagal. Periksa URL/token server.';
+
+  @override
+  String get mcpAddServer => 'Tambah server';
+
+  @override
+  String get mcpSaveChanges => 'Simpan perubahan';
+
+  @override
+  String get urlIsRequired => 'URL wajib diisi';
+
+  @override
+  String get enterValidUrl => 'Masukkan URL yang valid';
+
+  @override
+  String get commandIsRequired => 'Perintah wajib diisi';
+
+  @override
+  String skillRemoved(String name) {
+    return 'Keahlian \"$name\" dihapus';
+  }
+
+  @override
+  String get editFileContentHint => 'Edit konten file...';
+
+  @override
+  String get whatsAppPairSubtitle =>
+      'Pasangkan akun WhatsApp pribadi Anda dengan kode QR';
+
+  @override
+  String get whatsAppPairingOptional =>
+      'Pemasangan bersifat opsional. Anda dapat menyelesaikan onboarding sekarang dan menyelesaikan tautan nanti.';
+
+  @override
+  String get whatsAppEnableToLink =>
+      'Aktifkan WhatsApp untuk mulai menautkan perangkat ini.';
+
+  @override
+  String get whatsAppLinkedOnboarding =>
+      'WhatsApp telah ditautkan. FlutterClaw dapat merespons setelah onboarding.';
+
+  @override
+  String get cancelLink => 'Batalkan tautan';
 }

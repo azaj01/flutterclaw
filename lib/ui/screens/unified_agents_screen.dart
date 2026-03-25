@@ -991,7 +991,7 @@ class _UnifiedAgentsScreenState extends ConsumerState<UnifiedAgentsScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(content: Text(context.l10n.errorGeneric(e.toString()))),
         );
       }
     }
@@ -1023,9 +1023,9 @@ class _UnifiedAgentsScreenState extends ConsumerState<UnifiedAgentsScreen> {
             TextField(
               controller: controller,
               maxLines: 15,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-                hintText: 'Edit file content...',
+              decoration: InputDecoration(
+                border: const OutlineInputBorder(),
+                hintText: context.l10n.editFileContentHint,
               ),
             ),
             const SizedBox(height: 16),
@@ -1069,13 +1069,13 @@ class _UnifiedAgentsScreenState extends ConsumerState<UnifiedAgentsScreen> {
       await _loadAgentData();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$fileName saved')),
+          SnackBar(content: Text(context.l10n.fileSaved(fileName))),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error saving file: $e')),
+          SnackBar(content: Text(context.l10n.errorSavingFile(e.toString()))),
         );
       }
     }
@@ -1202,7 +1202,7 @@ class _UnifiedAgentsScreenState extends ConsumerState<UnifiedAgentsScreen> {
 
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Skill "$name" removed')),
+        SnackBar(content: Text(context.l10n.skillRemoved(name))),
       );
     }
 
@@ -1547,14 +1547,14 @@ class _UnifiedAgentsScreenState extends ConsumerState<UnifiedAgentsScreen> {
                                 context: ctx,
                                 builder: (dCtx) => AlertDialog(
                                   icon: const Icon(Icons.block, color: Colors.red, size: 32),
-                                  title: const Text('Incompatible Skill'),
+                                  title: Text(ctx.l10n.incompatibleSkill),
                                   content: Text(
-                                    'This skill cannot run on mobile (iOS/Android).\n\n${compat.reason}',
+                                    ctx.l10n.incompatibleSkillDesc(compat.reason),
                                   ),
                                   actions: [
                                     TextButton(
                                       onPressed: () => Navigator.pop(dCtx),
-                                      child: const Text('OK'),
+                                      child: Text(ctx.l10n.ok),
                                     ),
                                   ],
                                 ),

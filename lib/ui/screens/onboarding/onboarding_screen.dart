@@ -9,6 +9,7 @@ import 'package:flutterclaw/data/models/model_catalog.dart';
 import 'package:flutterclaw/services/background_service.dart';
 import 'package:flutterclaw/services/live_activity_service.dart';
 import 'package:flutterclaw/services/secure_key_store.dart';
+import 'package:flutterclaw/l10n/l10n_extension.dart';
 import 'package:flutterclaw/ui/screens/home_screen.dart';
 import 'package:flutterclaw/ui/screens/onboarding/accessibility_page.dart';
 import 'package:flutterclaw/ui/screens/onboarding/auth_page.dart';
@@ -177,7 +178,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       setState(() => _isStarting = false);
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      ).showSnackBar(SnackBar(content: Text(context.l10n.errorGeneric(e.toString()))));
     }
   }
 
@@ -268,7 +269,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                       },
                     )
                   else
-                    const Center(child: Text('Select a provider first')),
+                    Center(child: Text(context.l10n.selectProviderFirst)),
 
                   // 3 (Android only): Accessibility Service + Overlay permissions
                   if (Platform.isAndroid)
@@ -309,7 +310,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                     const Spacer(),
                     FilledButton(
                       onPressed: _canAdvance ? _nextPage : null,
-                      child: const Text('Continue'),
+                      child: Text(context.l10n.continueButton),
                     ),
                   ],
                 ),

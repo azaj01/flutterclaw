@@ -1317,16 +1317,16 @@ class AppLocalizationsEs extends AppLocalizations {
   String get voiceInput => 'Entrada de voz';
 
   @override
-  String get speakMessage => 'Speak';
+  String get speakMessage => 'Leer en voz alta';
 
   @override
-  String get stopSpeaking => 'Stop speaking';
+  String get stopSpeaking => 'Detener lectura';
 
   @override
-  String get selectText => 'Select Text';
+  String get selectText => 'Seleccionar texto';
 
   @override
-  String get messageCopied => 'Message copied';
+  String get messageCopied => 'Mensaje copiado';
 
   @override
   String get copyTooltip => 'Copiar';
@@ -1707,4 +1707,135 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get skipAction => 'Omitir';
+
+  @override
+  String get mcpServers => 'Servidores MCP';
+
+  @override
+  String get noMcpServersConfigured => 'No hay servidores MCP configurados';
+
+  @override
+  String get mcpServersEmptyHint =>
+      'Agrega servidores MCP para dar a tu agente acceso a herramientas de GitHub, Notion, Slack, bases de datos y más.';
+
+  @override
+  String get addMcpServer => 'Agregar servidor MCP';
+
+  @override
+  String get editMcpServer => 'Editar servidor MCP';
+
+  @override
+  String get removeMcpServer => 'Eliminar servidor MCP';
+
+  @override
+  String removeMcpServerConfirm(String name) {
+    return '¿Eliminar \"$name\"? Sus herramientas ya no estarán disponibles.';
+  }
+
+  @override
+  String get mcpTransport => 'Transporte';
+
+  @override
+  String get testConnection => 'Probar conexión';
+
+  @override
+  String get mcpServerNameLabel => 'Nombre del servidor';
+
+  @override
+  String get mcpServerNameHint => 'ej. GitHub, Notion, Mi BD';
+
+  @override
+  String get mcpServerUrlLabel => 'URL del servidor';
+
+  @override
+  String get mcpBearerTokenLabel => 'Token Bearer (opcional)';
+
+  @override
+  String get mcpBearerTokenHint =>
+      'Déjalo en blanco si no requiere autenticación';
+
+  @override
+  String get mcpCommandLabel => 'Comando';
+
+  @override
+  String get mcpArgumentsLabel => 'Argumentos (separados por espacios)';
+
+  @override
+  String get mcpEnvVarsLabel =>
+      'Variables de entorno (CLAVE=VALOR, una por línea)';
+
+  @override
+  String get mcpStdioNotOnIos =>
+      'stdio no está disponible en iOS. Usa HTTP o SSE.';
+
+  @override
+  String get connectedStatus => 'Conectado';
+
+  @override
+  String get mcpConnecting => 'Conectando...';
+
+  @override
+  String get mcpConnectionError => 'Error de conexión';
+
+  @override
+  String get mcpDisconnected => 'Desconectado';
+
+  @override
+  String mcpToolsCount(int count) {
+    return '$count herramientas';
+  }
+
+  @override
+  String mcpTestOkTools(int count) {
+    return 'OK — $count herramientas descubiertas';
+  }
+
+  @override
+  String get mcpTestOkNoTools => 'OK — Conectado (0 herramientas)';
+
+  @override
+  String get mcpTestFailed =>
+      'Conexión fallida. Verifica la URL/token del servidor.';
+
+  @override
+  String get mcpAddServer => 'Agregar servidor';
+
+  @override
+  String get mcpSaveChanges => 'Guardar cambios';
+
+  @override
+  String get urlIsRequired => 'La URL es obligatoria';
+
+  @override
+  String get enterValidUrl => 'Ingresa una URL válida';
+
+  @override
+  String get commandIsRequired => 'El comando es obligatorio';
+
+  @override
+  String skillRemoved(String name) {
+    return 'Habilidad \"$name\" eliminada';
+  }
+
+  @override
+  String get editFileContentHint => 'Editar contenido del archivo...';
+
+  @override
+  String get whatsAppPairSubtitle =>
+      'Vincula tu cuenta personal de WhatsApp con un código QR';
+
+  @override
+  String get whatsAppPairingOptional =>
+      'La vinculación es opcional. Puedes terminar el proceso ahora y completar el enlace más tarde.';
+
+  @override
+  String get whatsAppEnableToLink =>
+      'Activa WhatsApp para comenzar a vincular este dispositivo.';
+
+  @override
+  String get whatsAppLinkedOnboarding =>
+      'WhatsApp está vinculado. FlutterClaw podrá responder después del proceso inicial.';
+
+  @override
+  String get cancelLink => 'Cancelar enlace';
 }

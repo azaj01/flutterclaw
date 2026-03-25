@@ -1265,16 +1265,16 @@ class AppLocalizationsJa extends AppLocalizations {
   String get voiceInput => '音声入力';
 
   @override
-  String get speakMessage => 'Speak';
+  String get speakMessage => '読み上げ';
 
   @override
-  String get stopSpeaking => 'Stop speaking';
+  String get stopSpeaking => '読み上げを停止';
 
   @override
-  String get selectText => 'Select Text';
+  String get selectText => 'テキストを選択';
 
   @override
-  String get messageCopied => 'Message copied';
+  String get messageCopied => 'メッセージをコピーしました';
 
   @override
   String get copyTooltip => 'コピー';
@@ -1621,4 +1621,128 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get skipAction => 'スキップ';
+
+  @override
+  String get mcpServers => 'MCPサーバー';
+
+  @override
+  String get noMcpServersConfigured => 'MCPサーバーが設定されていません';
+
+  @override
+  String get mcpServersEmptyHint =>
+      'MCPサーバーを追加して、GitHub、Notion、Slack、データベースなどのツールにエージェントがアクセスできるようにしましょう。';
+
+  @override
+  String get addMcpServer => 'MCPサーバーを追加';
+
+  @override
+  String get editMcpServer => 'MCPサーバーを編集';
+
+  @override
+  String get removeMcpServer => 'MCPサーバーを削除';
+
+  @override
+  String removeMcpServerConfirm(String name) {
+    return '「$name」を削除しますか？そのツールは使用できなくなります。';
+  }
+
+  @override
+  String get mcpTransport => 'トランスポート';
+
+  @override
+  String get testConnection => '接続テスト';
+
+  @override
+  String get mcpServerNameLabel => 'サーバー名';
+
+  @override
+  String get mcpServerNameHint => '例：GitHub、Notion、マイDB';
+
+  @override
+  String get mcpServerUrlLabel => 'サーバーURL';
+
+  @override
+  String get mcpBearerTokenLabel => 'Bearerトークン（任意）';
+
+  @override
+  String get mcpBearerTokenHint => '認証が不要な場合は空欄';
+
+  @override
+  String get mcpCommandLabel => 'コマンド';
+
+  @override
+  String get mcpArgumentsLabel => '引数（スペース区切り）';
+
+  @override
+  String get mcpEnvVarsLabel => '環境変数（キー=値、1行に1つ）';
+
+  @override
+  String get mcpStdioNotOnIos => 'stdioはiOSでは使用できません。HTTPまたはSSEを使用してください。';
+
+  @override
+  String get connectedStatus => '接続済み';
+
+  @override
+  String get mcpConnecting => '接続中...';
+
+  @override
+  String get mcpConnectionError => '接続エラー';
+
+  @override
+  String get mcpDisconnected => '切断済み';
+
+  @override
+  String mcpToolsCount(int count) {
+    return '$count個のツール';
+  }
+
+  @override
+  String mcpTestOkTools(int count) {
+    return 'OK — $count個のツールを検出';
+  }
+
+  @override
+  String get mcpTestOkNoTools => 'OK — 接続済み（ツール0個）';
+
+  @override
+  String get mcpTestFailed => '接続失敗。サーバーのURL/トークンを確認してください。';
+
+  @override
+  String get mcpAddServer => 'サーバーを追加';
+
+  @override
+  String get mcpSaveChanges => '変更を保存';
+
+  @override
+  String get urlIsRequired => 'URLは必須です';
+
+  @override
+  String get enterValidUrl => '有効なURLを入力してください';
+
+  @override
+  String get commandIsRequired => 'コマンドは必須です';
+
+  @override
+  String skillRemoved(String name) {
+    return 'スキル「$name」を削除しました';
+  }
+
+  @override
+  String get editFileContentHint => 'ファイル内容を編集...';
+
+  @override
+  String get whatsAppPairSubtitle => 'QRコードで個人のWhatsAppアカウントを連携';
+
+  @override
+  String get whatsAppPairingOptional => '連携はオプションです。今すぐ初期設定を終えて、後でリンクを完了できます。';
+
+  @override
+  String get whatsAppEnableToLink => 'WhatsAppを有効にしてこのデバイスの連携を開始。';
+
+  @override
+  String get whatsAppLinkedOnboarding =>
+      'WhatsAppが連携されました。初期設定後にFlutterClawが応答できます。';
+
+  @override
+  String get cancelLink => 'リンクをキャンセル';
 }

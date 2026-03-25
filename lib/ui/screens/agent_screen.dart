@@ -1274,7 +1274,7 @@ class _AgentScreenState extends ConsumerState<AgentScreen> {
                       if (ctx.mounted) {
                         Navigator.pop(ctx);
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Failed to install ${skill.name}')),
+                          SnackBar(content: Text(context.l10n.failedToInstallSkill(skill.name))),
                         );
                       }
                       return;
