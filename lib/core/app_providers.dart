@@ -51,6 +51,7 @@ import 'package:flutterclaw/tools/session_tools.dart';
 import 'package:flutterclaw/tools/subagent_tools.dart';
 import 'package:flutterclaw/tools/cron_tools.dart';
 import 'package:flutterclaw/tools/shortcut_tools.dart';
+import 'package:flutterclaw/tools/skill_tools.dart';
 import 'package:flutterclaw/tools/ui_automation_tools.dart';
 import 'package:flutterclaw/tools/http_tools.dart';
 import 'package:flutterclaw/tools/web_tools.dart';
@@ -455,6 +456,13 @@ final toolRegistryProvider = Provider<ToolRegistry>((ref) {
   final sandboxSvc = ref.read(sandboxServiceProvider);
   registry.register(RunShellCommandTool(sandboxSvc));
 
+  // Skill management tools (install from ClawHub, create, list, remove)
+  final skillsSvc = ref.read(skillsServiceProvider);
+  registry.register(SkillInstallTool(skillsService: skillsSvc));
+  registry.register(SkillCreateTool(skillsService: skillsSvc));
+  registry.register(SkillListTool(skillsService: skillsSvc));
+  registry.register(SkillRemoveTool(skillsService: skillsSvc));
+
   return registry;
 });
 
@@ -485,7 +493,10 @@ final agentLoopProvider = Provider<AgentLoop>((ref) {
     providerRouter: ref.watch(providerRouterProvider),
     toolRegistry: ref.watch(toolRegistryProvider),
     sessionManager: ref.watch(sessionManagerProvider),
-    skillsPromptGetter: () => skillsService.getSkillsPrompt(),
+    skillsPromptGetter: () async {
+      await skillsService.loadSkills();
+      return skillsService.getSkillsPrompt();
+    },
     onToolStatus: (toolName, args, {bool isDone = false}) {
       final log = Logger('flutterclaw.tool_status');
       try {
