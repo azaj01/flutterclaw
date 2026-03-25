@@ -51,6 +51,7 @@ import 'package:flutterclaw/tools/session_tools.dart';
 import 'package:flutterclaw/tools/subagent_tools.dart';
 import 'package:flutterclaw/tools/cron_tools.dart';
 import 'package:flutterclaw/tools/shortcut_tools.dart';
+import 'package:flutterclaw/tools/skill_tools.dart';
 import 'package:flutterclaw/tools/ui_automation_tools.dart';
 import 'package:flutterclaw/tools/http_tools.dart';
 import 'package:flutterclaw/tools/web_tools.dart';
@@ -67,6 +68,9 @@ import 'package:flutterclaw/services/overlay_service.dart';
 import 'package:flutterclaw/services/text_to_speech_service.dart';
 import 'package:flutterclaw/services/speech_to_text_service.dart';
 import 'package:flutterclaw/tools/tool_status_formatter.dart';
+import 'package:flutterclaw/services/mcp/mcp_client_manager.dart';
+import 'package:flutterclaw/tools/mcp_proxy_tool.dart';
+import 'package:flutterclaw/tools/mcp_management_tools.dart';
 
 final configManagerProvider = Provider<ConfigManager>((ref) {
   return ConfigManager();
@@ -171,6 +175,14 @@ final uiAutomationServiceProvider = Provider<UiAutomationService>((ref) {
 
 final sandboxServiceProvider = Provider<SandboxService>((ref) {
   return SandboxService();
+});
+
+/// MCP client manager — connects to configured MCP servers and exposes their
+/// tools. Connection happens asynchronously after the registry is set up.
+final mcpClientManagerProvider = Provider<McpClientManager>((ref) {
+  final manager = McpClientManager();
+  ref.onDispose(() => manager.disconnectAll());
+  return manager;
 });
 
 /// Late-binder so MessageTool can send to channels without a circular provider dep.
@@ -455,6 +467,42 @@ final toolRegistryProvider = Provider<ToolRegistry>((ref) {
   final sandboxSvc = ref.read(sandboxServiceProvider);
   registry.register(RunShellCommandTool(sandboxSvc));
 
+  // Skill management tools (install from ClawHub, create, list, remove)
+  final skillsSvc = ref.read(skillsServiceProvider);
+  registry.register(SkillInstallTool(skillsService: skillsSvc));
+  registry.register(SkillCreateTool(skillsService: skillsSvc));
+  registry.register(SkillListTool(skillsService: skillsSvc));
+  registry.register(SkillRemoveTool(skillsService: skillsSvc));
+
+  // MCP server management tools — let the agent configure MCP servers conversationally.
+  final mcpManager = ref.read(mcpClientManagerProvider);
+  registry.register(McpServerListTool(
+      configManager: configManager, mcpManager: mcpManager));
+  registry.register(
+      McpServerAddTool(configManager: configManager, mcpManager: mcpManager));
+  registry.register(McpServerRemoveTool(
+      configManager: configManager, mcpManager: mcpManager));
+
+  // MCP server tools — dynamically registered when servers connect/disconnect.
+  mcpManager.onToolsChanged = (serverId, entry, tools) {
+    // Remove old proxy tools for this server, then register the new ones.
+    registry.unregisterPrefix('mcp_${McpProxyTool.sanitizeName(entry.name)}_');
+    for (final toolInfo in tools) {
+      registry.register(McpProxyTool(
+        serverId: serverId,
+        serverName: entry.name,
+        toolName: toolInfo.name,
+        toolDescription: toolInfo.description,
+        inputSchema: toolInfo.inputSchema,
+        manager: mcpManager,
+      ));
+    }
+  };
+  // Connect enabled MCP servers in the background (non-blocking).
+  unawaited(
+    mcpManager.connectAll(configManager.config.mcpServers),
+  );
+
   return registry;
 });
 
@@ -485,7 +533,10 @@ final agentLoopProvider = Provider<AgentLoop>((ref) {
     providerRouter: ref.watch(providerRouterProvider),
     toolRegistry: ref.watch(toolRegistryProvider),
     sessionManager: ref.watch(sessionManagerProvider),
-    skillsPromptGetter: () => skillsService.getSkillsPrompt(),
+    skillsPromptGetter: () async {
+      await skillsService.loadSkills();
+      return skillsService.getSkillsPrompt();
+    },
     onToolStatus: (toolName, args, {bool isDone = false}) {
       final log = Logger('flutterclaw.tool_status');
       try {

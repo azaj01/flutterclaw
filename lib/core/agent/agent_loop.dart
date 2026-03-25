@@ -81,7 +81,7 @@ class AgentLoop {
   final ProviderRouter providerRouter;
   final ToolRegistry toolRegistry;
   final SessionManager sessionManager;
-  String Function()? skillsPromptGetter;
+  Future<String> Function()? skillsPromptGetter;
 
   /// Optional callback invoked for every tool call, regardless of caller
   /// (ChatNotifier, channels, subagents). Use for overlay/notification.
@@ -1204,7 +1204,7 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
 
     // Inject skills
     if (skillsPromptGetter != null) {
-      final skillsPrompt = skillsPromptGetter!();
+      final skillsPrompt = await skillsPromptGetter!();
       if (skillsPrompt.isNotEmpty) {
         sections.add(skillsPrompt);
       }

@@ -87,7 +87,10 @@ class IosGatewayService {
         providerRouter: providerRouter,
         toolRegistry: toolRegistry,
         sessionManager: sessionManager,
-        skillsPromptGetter: () => skillsService.getSkillsPrompt(),
+        skillsPromptGetter: () async {
+          await skillsService.loadSkills();
+          return skillsService.getSkillsPrompt();
+        },
       );
       _log.info('AgentLoop created');
 
@@ -278,7 +281,10 @@ class IosGatewayService {
         providerRouter: _providerRouter!,
         toolRegistry: _toolRegistry!,
         sessionManager: _sessionManager!,
-        skillsPromptGetter: () => _skillsService!.getSkillsPrompt(),
+        skillsPromptGetter: () async {
+          await _skillsService!.loadSkills();
+          return _skillsService!.getSkillsPrompt();
+        },
       );
       final gateway = GatewayServer(
         configManager: _configManager!,

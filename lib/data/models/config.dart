@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutterclaw/data/models/agent_profile.dart';
+import 'package:flutterclaw/data/models/mcp_server_config.dart';
 import 'package:flutterclaw/data/models/model_catalog.dart';
 
 /// Stores authentication credentials for a provider (API key + optional base URL).
@@ -508,6 +509,10 @@ class FlutterClawConfig {
   /// has an explicit per-model apiKey override.
   final Map<String, ProviderCredential> providerCredentials;
 
+  /// MCP server entries. Each entry represents an external MCP server whose
+  /// tools are dynamically registered into the ToolRegistry.
+  final List<McpServerEntry> mcpServers;
+
   const FlutterClawConfig({
     this.agents = const AgentsConfig(),
     this.modelList = const [],
@@ -519,6 +524,7 @@ class FlutterClawConfig {
     this.agentProfiles = const [],
     this.activeAgentId,
     this.providerCredentials = const {},
+    this.mcpServers = const [],
   });
 
   ModelEntry? getModel(String name) {
@@ -633,6 +639,11 @@ class FlutterClawConfig {
               ),
             ) ??
             {},
+        mcpServers:
+            (json['mcp_servers'] as List<dynamic>?)
+                ?.map((e) => McpServerEntry.fromJson(e as Map<String, dynamic>))
+                .toList() ??
+            [],
       );
 
   Map<String, dynamic> toJson() => {
@@ -649,6 +660,8 @@ class FlutterClawConfig {
       'provider_credentials': providerCredentials.map(
         (k, v) => MapEntry(k, v.toJson()),
       ),
+    if (mcpServers.isNotEmpty)
+      'mcp_servers': mcpServers.map((e) => e.toJson()).toList(),
   };
 
   FlutterClawConfig copyWith({
@@ -662,6 +675,7 @@ class FlutterClawConfig {
     List<AgentProfile>? agentProfiles,
     String? activeAgentId,
     Map<String, ProviderCredential>? providerCredentials,
+    List<McpServerEntry>? mcpServers,
   }) => FlutterClawConfig(
     agents: agents ?? this.agents,
     modelList: modelList ?? this.modelList,
@@ -673,6 +687,7 @@ class FlutterClawConfig {
     agentProfiles: agentProfiles ?? this.agentProfiles,
     activeAgentId: activeAgentId ?? this.activeAgentId,
     providerCredentials: providerCredentials ?? this.providerCredentials,
+    mcpServers: mcpServers ?? this.mcpServers,
   );
 }
 
