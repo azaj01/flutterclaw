@@ -88,8 +88,18 @@ class ToolRegistry {
   /// Optional hook runner. Set via [setHookRunner] after construction.
   HookRunner? _hookRunner;
 
+  /// When true, the next blocked tool call is allowed through and this flag
+  /// is immediately cleared. Set via [setSecurityOverride] from /unsafe command.
+  bool _securityOverride = false;
+
   void setHookRunner(HookRunner runner) {
     _hookRunner = runner;
+  }
+
+  /// Allow the next security-blocked tool call to execute.
+  /// Clears automatically after one use.
+  void setSecurityOverride() {
+    _securityOverride = true;
   }
 
   /// Set the config manager (called during initialization).
@@ -178,12 +188,17 @@ class ToolRegistry {
 
     final scan = _scanner.scan(name, args);
     if (scan.hasBlock) {
-      final msg = scan.blocks.map((i) => i.description).join('; ');
-      _log.warning('Security block on $name: $msg');
-      return ToolResult.error(
-          'Security policy blocked "$name": $msg\n\n'
-          'This pattern matches a known dangerous operation. '
-          'If this is intentional, rephrase the request to avoid the blocked pattern.');
+      if (_securityOverride) {
+        _securityOverride = false;
+        _log.warning('Security override active — allowing blocked tool "$name"');
+      } else {
+        final msg = scan.blocks.map((i) => i.description).join('; ');
+        _log.warning('Security block on $name: $msg');
+        return ToolResult.error(
+            'Security policy blocked "$name": $msg\n\n'
+            'This pattern matches a known dangerous operation. '
+            'If you intended this, use /unsafe to allow the next tool call.');
+      }
     }
     if (scan.warnings.isNotEmpty) {
       final msg = scan.warnings.map((i) => i.description).join('; ');
@@ -236,12 +251,17 @@ class ToolRegistry {
 
     final scan = _scanner.scan(name, args);
     if (scan.hasBlock) {
-      final msg = scan.blocks.map((i) => i.description).join('; ');
-      _log.warning('Security block on $name: $msg');
-      return ToolResult.error(
-          'Security policy blocked "$name": $msg\n\n'
-          'This pattern matches a known dangerous operation. '
-          'If this is intentional, rephrase the request to avoid the blocked pattern.');
+      if (_securityOverride) {
+        _securityOverride = false;
+        _log.warning('Security override active — allowing blocked tool "$name"');
+      } else {
+        final msg = scan.blocks.map((i) => i.description).join('; ');
+        _log.warning('Security block on $name: $msg');
+        return ToolResult.error(
+            'Security policy blocked "$name": $msg\n\n'
+            'This pattern matches a known dangerous operation. '
+            'If you intended this, use /unsafe to allow the next tool call.');
+      }
     }
     if (scan.warnings.isNotEmpty) {
       _log.info('Security warning on $name: '

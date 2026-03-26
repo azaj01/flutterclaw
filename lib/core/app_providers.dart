@@ -743,6 +743,7 @@ final chatCommandHandlerProvider = Provider<ChatCommandHandler>((ref) {
     agentLoop: ref.read(agentLoopProvider),
     providerRouter: ref.read(providerRouterProvider),
     sandboxService: ref.read(sandboxServiceProvider),
+    toolRegistry: ref.read(toolRegistryProvider),
   );
 });
 

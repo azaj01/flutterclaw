@@ -14,6 +14,7 @@ import 'package:flutterclaw/core/agent/token_budget_manager.dart';
 import 'package:flutterclaw/core/providers/provider_interface.dart';
 import 'package:flutterclaw/data/models/config.dart';
 import 'package:flutterclaw/services/sandbox_service.dart';
+import 'package:flutterclaw/tools/registry.dart';
 
 final _log = Logger('flutterclaw.chat_commands');
 
@@ -45,6 +46,7 @@ class ChatCommandHandler {
   final AgentLoop agentLoop;
   final ProviderRouter providerRouter;
   final SandboxService sandboxService;
+  final ToolRegistry toolRegistry;
 
   ChatCommandHandler({
     required this.sessionManager,
@@ -52,6 +54,7 @@ class ChatCommandHandler {
     required this.agentLoop,
     required this.providerRouter,
     required this.sandboxService,
+    required this.toolRegistry,
   });
 
   Future<ChatCommandResult> handle(String sessionKey, String message) async {
@@ -90,6 +93,8 @@ class ChatCommandHandler {
       case '/btw':
         final question = message.trim().replaceFirst(RegExp(r'^/btw\s*', caseSensitive: false), '');
         return _handleBtw(sessionKey, question);
+      case '/unsafe':
+        return _handleUnsafe();
       case '/bg':
         final task = message.trim().replaceFirst(RegExp(r'^/bg\s*', caseSensitive: false), '');
         return _handleBg(sessionKey, task);
@@ -589,6 +594,16 @@ class ChatCommandHandler {
     }
   }
 
+  ChatCommandResult _handleUnsafe() {
+    toolRegistry.setSecurityOverride();
+    return const ChatCommandResult(
+      handled: true,
+      response: '⚠️ **Security override active for the next tool call.**\n\n'
+          'The next blocked operation will be allowed through once. '
+          'Send your message now to proceed.',
+    );
+  }
+
   Future<ChatCommandResult> _handleBg(
     String parentSessionKey,
     String task,
@@ -737,6 +752,7 @@ class ChatCommandHandler {
           '- `/compact` — compress session context\n'
           '- `/model [name]` — view or switch model\n'
           '- `/think [off|low|medium|high]` — extended thinking level\n'
+          '- `/unsafe` — allow the next security-blocked tool call\n'
           '- `/bg <task>` — run a task in the background\n'
           '- `/rewind [N]` — undo last N exchanges (default 1)\n'
           '- `/fork` — branch current session into a new one\n'

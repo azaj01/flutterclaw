@@ -496,7 +496,7 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
 
     // Resolve thinking/effort settings from session meta.
     final sessionMeta = sessionManager.getMeta(sessionKey);
-    final thinkingLevel = sessionMeta?.thinkingLevel;
+    final thinkingLevel = _resolveThinkingLevel(sessionMeta?.thinkingLevel, modelEntry);
     final thinkingBudget = _thinkingBudgetForLevel(thinkingLevel);
     final effortLevel = _effortForLevel(thinkingLevel);
 
@@ -846,7 +846,7 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
 
     // Resolve thinking/effort settings from session meta.
     final sessionMetaStream = sessionManager.getMeta(sessionKey);
-    final thinkingLevelStream = sessionMetaStream?.thinkingLevel;
+    final thinkingLevelStream = _resolveThinkingLevel(sessionMetaStream?.thinkingLevel, modelEntry);
     final thinkingBudgetStream = _thinkingBudgetForLevel(thinkingLevelStream);
     final effortLevelStream = _effortForLevel(thinkingLevelStream);
 
@@ -1715,6 +1715,24 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
       completionTokens: a.completionTokens + b.completionTokens,
       totalTokens: a.totalTokens + b.totalTokens,
     );
+  }
+
+  /// Resolves the effective thinking level for a request.
+  ///
+  /// If the user has explicitly set a level (including 'off'), that wins.
+  /// Otherwise, Anthropic-family models default to 'low' thinking so the model
+  /// can reason adaptively without the user needing to configure anything.
+  /// Non-Anthropic models default to null (no thinking).
+  String? _resolveThinkingLevel(String? explicit, ModelEntry modelEntry) {
+    if (explicit != null) {
+      // 'off' means the user explicitly disabled thinking
+      return explicit == 'off' ? null : explicit;
+    }
+    // Auto-enable low thinking for Anthropic models (direct + Bedrock)
+    final isAnthropic = modelEntry.provider == 'anthropic' ||
+        modelEntry.provider == 'bedrock' ||
+        (modelEntry.apiBase?.contains('api.anthropic.com') ?? false);
+    return isAnthropic ? 'low' : null;
   }
 
   /// Maps a thinking level string to an Anthropic thinking budget token count.
