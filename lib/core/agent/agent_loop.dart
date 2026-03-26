@@ -1071,8 +1071,32 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
     return lines.join('\n');
   }
 
+  // Per-session compaction failure counters (resets on success).
+  // Used by the compaction safeguard to disable auto-compact after
+  // repeated failures so a broken session doesn't loop forever.
+  final Map<String, int> _compactionFailures = {};
+  static const _kMaxCompactionFailures = 3;
+
   /// Summarize old messages and compact the session.
-  Future<String?> compactSession(String sessionKey) async {
+  ///
+  /// [customInstructions] can be provided by the user via `/compact <text>`
+  /// to guide what the summary should focus on.
+  Future<String?> compactSession(
+    String sessionKey, {
+    String? customInstructions,
+  }) async {
+    // -- Compaction safeguard -------------------------------------------------
+    // If this session has failed compaction _kMaxCompactionFailures times in
+    // a row, disable auto-compact to prevent infinite retry loops.
+    final failures = _compactionFailures[sessionKey] ?? 0;
+    if (failures >= _kMaxCompactionFailures) {
+      _log.warning(
+        'Compaction safeguard: $sessionKey has failed $failures times, '
+        'skipping auto-compact',
+      );
+      return null;
+    }
+
     final session = sessionManager.getSession(sessionKey);
     if (session == null) return null;
 
@@ -1103,28 +1127,40 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
       final firstKeptIdx = context.length - keepRecent;
       final firstKept = context[firstKeptIdx];
       if (firstKept.role == 'tool' ||
-          (firstKept.role == 'assistant' && firstKept.toolCalls != null && firstKept.toolCalls!.isNotEmpty)) {
+          (firstKept.role == 'assistant' &&
+              firstKept.toolCalls != null &&
+              firstKept.toolCalls!.isNotEmpty)) {
         keepRecent++;
       } else {
         break;
       }
     }
-    // Re-read context: the memory flush may have appended messages.
+    // Re-read context: the memory flush (PR #18) may have appended messages.
     final freshContext = sessionManager.getContextMessages(sessionKey);
     final toSummarize = freshContext.sublist(0, freshContext.length - keepRecent);
 
     if (toSummarize.isEmpty) return null;
 
-    // Build a summary prompt
+    // -- Real conversation filtering ------------------------------------------
+    // Remove noise before summarizing: pure system injections, empty messages,
+    // and failed/empty tool results that add no informational value.
+    // This produces tighter, more useful summaries and saves tokens.
+    final realConversation = _filterRealConversation(toSummarize);
+    if (realConversation.isEmpty) return null;
+
+    // Build the summary prompt, incorporating any custom instructions
+    final systemInstruction = StringBuffer(
+      'Summarize the following conversation in 2-3 concise paragraphs. '
+      'Preserve key facts, decisions, user preferences, and tool results. '
+      'Do not include greetings or filler.',
+    );
+    if (customInstructions != null && customInstructions.trim().isNotEmpty) {
+      systemInstruction.write('\n\nAdditional instructions: $customInstructions');
+    }
+
     final summaryMessages = <LlmMessage>[
-      const LlmMessage(
-        role: 'system',
-        content:
-            'Summarize the following conversation in 2-3 concise paragraphs. '
-            'Preserve key facts, decisions, user preferences, and tool results. '
-            'Do not include greetings or filler.',
-      ),
-      ...toSummarize,
+      LlmMessage(role: 'system', content: systemInstruction.toString()),
+      ...realConversation,
       const LlmMessage(
         role: 'user',
         content: 'Summarize the conversation above.',
@@ -1132,7 +1168,8 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
     ];
 
     try {
-      final summCred = configManager.config.providerCredentials[modelEntry.provider];
+      final summCred =
+          configManager.config.providerCredentials[modelEntry.provider];
       final request = LlmRequest(
         model: modelEntry.model,
         apiKey: configManager.config.resolveApiKey(modelEntry),
@@ -1150,7 +1187,10 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
       final response = await providerRouter.chatCompletion(request);
       final summary = response.content ?? '';
 
-      if (summary.isEmpty) return null;
+      if (summary.isEmpty) {
+        _compactionFailures[sessionKey] = failures + 1;
+        return null;
+      }
 
       // Find the entry ID of the first kept message from the transcript
       final transcript = await sessionManager.loadTranscript(sessionKey);
@@ -1160,10 +1200,9 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
       final keptStartIndex = messageEntries.length - keepRecent;
       final firstKeptId =
           keptStartIndex >= 0 && keptStartIndex < messageEntries.length
-          ? messageEntries[keptStartIndex].id
-          : messageEntries.last.id;
+              ? messageEntries[keptStartIndex].id
+              : messageEntries.last.id;
 
-      // Estimate tokens summarized
       final tokensBefore = toSummarize.fold<int>(
         0,
         (sum, m) => sum + ((m.content?.toString().length ?? 0) ~/ 4),
@@ -1176,14 +1215,48 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
         tokensBefore: tokensBefore,
       );
 
+      // Success — reset failure counter
+      _compactionFailures.remove(sessionKey);
       _log.info(
-        'Compacted session $sessionKey: summarized ${toSummarize.length} messages',
+        'Compacted session $sessionKey: summarized ${toSummarize.length} msgs '
+        '(${realConversation.length} real msgs after filtering)',
       );
       return summary;
     } catch (e) {
-      _log.warning('Compaction failed for $sessionKey: $e');
+      _compactionFailures[sessionKey] = failures + 1;
+      _log.warning('Compaction failed for $sessionKey (attempt ${failures + 1}): $e');
       return null;
     }
+  }
+
+  /// Filters a message list down to "real conversation" — removing noise
+  /// that adds no informational value to a summary:
+  ///   • System injections (role == 'system')
+  ///   • Empty or whitespace-only messages
+  ///   • Tool results that are empty, error-only, or just truncation markers
+  List<LlmMessage> _filterRealConversation(List<LlmMessage> messages) {
+    return messages.where((m) {
+      // Drop system messages (they're injected fresh on every turn)
+      if (m.role == 'system') return false;
+
+      final content = m.content;
+      final text = content is String ? content : content?.toString() ?? '';
+
+      // Drop empty messages
+      if (text.trim().isEmpty) return false;
+
+      // Drop tool results that contain only a truncation marker
+      if (m.role == 'tool' && text.contains('[... TOOL RESULT TRUNCATED')) {
+        // Keep if there's at least some real content besides the marker
+        final withoutMarker = text.replaceAll(
+          RegExp(r'\[\.{3} TOOL RESULT TRUNCATED.*?\]', dotAll: true),
+          '',
+        );
+        return withoutMarker.trim().length > 50;
+      }
+
+      return true;
+    }).toList();
   }
 
   /// Silent agentic turn that runs before compaction to let the model persist
@@ -1206,8 +1279,6 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
           : await configManager.workspacePath;
 
       // Only the memory_write tool is exposed during the flush.
-      // This prevents unintended side effects (no web calls, no file writes
-      // outside memory, no UI automation, etc.).
       final memoryTool = toolRegistry.get('memory_write');
       final flushTools = memoryTool != null
           ? [
@@ -1233,7 +1304,6 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
 
       final flushMessages = <LlmMessage>[
         LlmMessage(role: 'system', content: flushSystemPrompt),
-        // Show the messages to be compacted so the model can evaluate them
         ...context,
         const LlmMessage(
           role: 'user',
@@ -1263,7 +1333,6 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
 
       final response = await providerRouter.chatCompletion(request);
 
-      // Execute any memory_write tool calls the model decided to make
       if (response.toolCalls != null) {
         for (final tc in response.toolCalls!) {
           if (tc.function.name == 'memory_write') {
@@ -1280,7 +1349,6 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
 
       _log.info('Memory flush complete for $sessionKey');
     } catch (e) {
-      // Memory flush is best-effort — a failure must not block compaction.
       _log.warning('Memory flush failed (continuing with compaction): $e');
     }
   }
@@ -1570,6 +1638,12 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
       return false;
     }
 
+    // Compaction safeguard: don't auto-compact if repeated failures
+    final failures = _compactionFailures[sessionKey] ?? 0;
+    if (failures >= _kMaxCompactionFailures) {
+      return false;
+    }
+
     final session = sessionManager.getSession(sessionKey);
     if (session == null) return false;
 
@@ -1581,7 +1655,6 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
         await sessionManager.getLastCompactionEntry(sessionKey);
     if (lastCompactEntry != null) {
       // Don't compact if recently compacted (within last 10 messages)
-      // This is approximate - better would be to track entry count
       if (context.length < 20) {
         return false; // Recently compacted, context still small
       }
