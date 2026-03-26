@@ -52,7 +52,8 @@ class ChatCommandHandler {
       case '/reset':
         return _handleReset(sessionKey);
       case '/compact':
-        return _handleCompact(sessionKey);
+        final instructions = message.trim().replaceFirst(RegExp(r'^/compact\s*', caseSensitive: false), '');
+        return _handleCompact(sessionKey, customInstructions: instructions.isEmpty ? null : instructions);
       case '/model':
         return _handleModel(sessionKey, args);
       case '/think':
@@ -107,12 +108,18 @@ class ChatCommandHandler {
     );
   }
 
-  Future<ChatCommandResult> _handleCompact(String sessionKey) async {
-    final summary = await agentLoop.compactSession(sessionKey);
+  Future<ChatCommandResult> _handleCompact(
+    String sessionKey, {
+    String? customInstructions,
+  }) async {
+    final summary = await agentLoop.compactSession(
+      sessionKey,
+      customInstructions: customInstructions,
+    );
     if (summary == null) {
       return const ChatCommandResult(
         handled: true,
-        response: 'Nothing to compact (session too short).',
+        response: 'Nothing to compact (session too short or safeguard active).',
       );
     }
     return ChatCommandResult(
