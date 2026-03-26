@@ -23,6 +23,8 @@ import 'package:flutterclaw/core/providers/provider_interface.dart';
 import 'package:flutterclaw/services/cron_service.dart';
 import 'package:flutterclaw/services/heartbeat_runner.dart';
 import 'package:flutterclaw/services/pairing_service.dart';
+import 'package:flutterclaw/services/hook_runner.dart';
+import 'package:flutterclaw/services/plugin_service.dart';
 import 'package:flutterclaw/services/skills_service.dart';
 import 'package:flutterclaw/data/models/model_catalog.dart';
 import 'package:flutterclaw/core/agent/agent_loop.dart';
@@ -231,6 +233,11 @@ final mcpClientManagerProvider = Provider<McpClientManager>((ref) {
 /// Late-binder so MessageTool can send to channels without a circular provider dep.
 void Function(ChannelRouter)? _pendingChannelRouterBinder;
 
+/// Shared hook runner — register built-in and user-defined hooks here.
+final hookRunnerProvider = Provider<HookRunner>((ref) {
+  return HookRunner();
+});
+
 final toolRegistryProvider = Provider<ToolRegistry>((ref) {
   final configManager = ref.read(configManagerProvider);
   final sessionManager = ref.read(sessionManagerProvider);
@@ -239,6 +246,9 @@ final toolRegistryProvider = Provider<ToolRegistry>((ref) {
 
   // Set config manager for token budget management
   registry.setConfigManager(configManager);
+
+  // Wire the shared hook runner into the tool registry
+  registry.setHookRunner(ref.read(hookRunnerProvider));
 
   // Apply tool policies from config
   registry.setDisabledTools(configManager.config.tools.disabled);
@@ -581,6 +591,7 @@ final agentLoopProvider = Provider<AgentLoop>((ref) {
     providerRouter: ref.watch(providerRouterProvider),
     toolRegistry: ref.watch(toolRegistryProvider),
     sessionManager: ref.watch(sessionManagerProvider),
+    hookRunner: ref.read(hookRunnerProvider),
     skillsPromptGetter: () async {
       await skillsService.loadSkills();
       return skillsService.getSkillsPrompt();
@@ -732,6 +743,7 @@ final chatCommandHandlerProvider = Provider<ChatCommandHandler>((ref) {
     agentLoop: ref.read(agentLoopProvider),
     providerRouter: ref.read(providerRouterProvider),
     sandboxService: ref.read(sandboxServiceProvider),
+    toolRegistry: ref.read(toolRegistryProvider),
   );
 });
 
@@ -808,6 +820,14 @@ final skillsServiceProvider = Provider<SkillsService>((ref) {
       final response = await provider.chatCompletion(request);
       return response.content;
     },
+  );
+});
+
+/// Plugin lifecycle service — loads plugins from workspace/plugins/.
+final pluginServiceProvider = Provider<PluginService>((ref) {
+  return PluginService(
+    configManager: ref.read(configManagerProvider),
+    hookRunner: ref.read(hookRunnerProvider),
   );
 });
 
@@ -943,9 +963,12 @@ final channelStartupProvider = FutureProvider<void>((ref) async {
   final heartbeat = ref.read(heartbeatRunnerProvider);
   await heartbeat.start();
 
-  // Load skills
+  // Load skills and plugins
   final skillsService = ref.read(skillsServiceProvider);
   await skillsService.loadSkills();
+
+  final pluginService = ref.read(pluginServiceProvider);
+  await pluginService.loadPlugins();
 });
 
 class ChatMessage {
@@ -1079,6 +1102,31 @@ final activeSessionsProvider = StreamProvider<List<SessionMeta>>((ref) async* {
     yield sessionManager.listActiveSessions();
   }
 });
+
+/// The SessionMeta for the currently active session key.
+/// Rebuilds whenever session data changes (e.g. after /think command).
+final activeSessionMetaProvider = Provider<SessionMeta?>((ref) {
+  final key = ref.watch(activeSessionKeyProvider);
+  // Subscribe to session changes so this provider rebuilds when meta updates.
+  final sessions = ref.watch(activeSessionsProvider);
+  final list = sessions.asData?.value;
+  return list?.where((s) => s.key == key).firstOrNull;
+});
+
+/// Whether persistent unsafe mode (security bypass) is currently enabled.
+/// Synced with [ToolRegistry.persistentUnsafeMode].
+final unsafeModeProvider =
+    NotifierProvider<_UnsafeModeNotifier, bool>(_UnsafeModeNotifier.new);
+
+class _UnsafeModeNotifier extends Notifier<bool> {
+  @override
+  bool build() => false; // always off on app start
+
+  void set(bool value) {
+    state = value;
+    ref.read(toolRegistryProvider).setPersistentUnsafeMode(value);
+  }
+}
 
 final chatProvider = NotifierProvider<ChatNotifier, List<ChatMessage>>(
   ChatNotifier.new,

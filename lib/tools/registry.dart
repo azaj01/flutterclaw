@@ -8,6 +8,8 @@ import 'package:logging/logging.dart';
 
 import '../core/agent/token_budget_manager.dart';
 import '../data/models/config.dart';
+import '../services/hook_runner.dart';
+import '../services/security_scanner.dart';
 
 final _log = Logger('flutterclaw.tool_registry');
 
@@ -80,6 +82,35 @@ class ToolRegistry {
 
   /// Config manager for accessing model context limits.
   ConfigManager? _configManager;
+
+  final _scanner = SecurityScanner();
+
+  /// Optional hook runner. Set via [setHookRunner] after construction.
+  HookRunner? _hookRunner;
+
+  /// One-shot override: allows a single blocked tool call through, then clears.
+  bool _securityOverride = false;
+
+  /// Persistent unsafe mode: all security blocks become warnings until toggled off.
+  bool _persistentUnsafeMode = false;
+
+  bool get persistentUnsafeMode => _persistentUnsafeMode;
+
+  void setHookRunner(HookRunner runner) {
+    _hookRunner = runner;
+  }
+
+  /// Allow the next security-blocked tool call to execute (one-shot).
+  void setSecurityOverride() {
+    _securityOverride = true;
+  }
+
+  /// Toggle persistent unsafe mode. When enabled, security blocks are
+  /// downgraded to warnings and execution continues.
+  void setPersistentUnsafeMode(bool value) {
+    _persistentUnsafeMode = value;
+    if (value) _securityOverride = false; // clear one-shot if enabling persistent
+  }
 
   /// Set the config manager (called during initialization).
   void setConfigManager(ConfigManager manager) {
@@ -165,7 +196,44 @@ class ToolRegistry {
       return ToolResult.error('Tool "$name" not found or expired');
     }
 
+    final scan = _scanner.scan(name, args);
+    if (scan.hasBlock) {
+      if (_securityOverride) {
+        _securityOverride = false; // consume one-shot
+        _log.warning('Security override (one-shot) — allowing blocked tool "$name"');
+      } else if (_persistentUnsafeMode) {
+        _log.warning('Security bypass (unsafe mode on) — allowing blocked tool "$name"');
+      } else {
+        final msg = scan.blocks.map((i) => i.description).join('; ');
+        _log.warning('Security block on $name: $msg');
+        return ToolResult.error(
+            'Security policy blocked "$name": $msg\n\n'
+            'Use /unsafe for a one-shot override, or /unsafe on to disable '
+            'security checks for this session.');
+      }
+    }
+    if (scan.warnings.isNotEmpty) {
+      final msg = scan.warnings.map((i) => i.description).join('; ');
+      _log.info('Security warning on $name: $msg');
+    }
+
+    if (_hookRunner != null) {
+      final hookResult = await _hookRunner!.runPreToolUse(name, args);
+      if (!hookResult.allow) {
+        return ToolResult.error(
+            'Hook blocked "$name": ${hookResult.message ?? 'blocked by hook'}');
+      }
+    }
+
     final result = await tool.execute(args);
+
+    if (_hookRunner != null) {
+      await _hookRunner!.runPostToolUse(
+        name,
+        result.content,
+        isError: result.isError,
+      );
+    }
 
     // Apply truncation middleware if needed
     return _maybeTruncateResult(name, result);
@@ -191,6 +259,35 @@ class ToolRegistry {
     final tool = get(name);
     if (tool == null) {
       return ToolResult.error('Tool "$name" not found or expired');
+    }
+
+    final scan = _scanner.scan(name, args);
+    if (scan.hasBlock) {
+      if (_securityOverride) {
+        _securityOverride = false; // consume one-shot
+        _log.warning('Security override (one-shot) — allowing blocked tool "$name"');
+      } else if (_persistentUnsafeMode) {
+        _log.warning('Security bypass (unsafe mode on) — allowing blocked tool "$name"');
+      } else {
+        final msg = scan.blocks.map((i) => i.description).join('; ');
+        _log.warning('Security block on $name: $msg');
+        return ToolResult.error(
+            'Security policy blocked "$name": $msg\n\n'
+            'Use /unsafe for a one-shot override, or /unsafe on to disable '
+            'security checks for this session.');
+      }
+    }
+    if (scan.warnings.isNotEmpty) {
+      _log.info('Security warning on $name: '
+          '${scan.warnings.map((i) => i.description).join('; ')}');
+    }
+
+    if (_hookRunner != null) {
+      final hookResult = await _hookRunner!.runPreToolUse(name, args);
+      if (!hookResult.allow) {
+        return ToolResult.error(
+            'Hook blocked "$name": ${hookResult.message ?? 'blocked by hook'}');
+      }
     }
 
     ToolResult result;

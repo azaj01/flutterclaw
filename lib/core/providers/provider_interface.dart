@@ -29,6 +29,13 @@ class LlmRequest {
   final String? awsRegion;
   /// Bedrock auth mode: 'bearer' or 'sigv4'.
   final String? awsAuthMode;
+  /// Extended thinking budget tokens (Anthropic only). When set, enables
+  /// interleaved thinking with the specified token budget.
+  /// Must be >= 1024. Temperature is forced to 1.0 when thinking is enabled.
+  final int? thinkingBudget;
+  /// Reasoning effort for OpenAI o-series models: 'low' | 'medium' | 'high'.
+  /// Maps to the `reasoning_effort` parameter in the OpenAI API.
+  final String? effort;
 
   const LlmRequest({
     required this.model,
@@ -43,6 +50,8 @@ class LlmRequest {
     this.awsSecretKey,
     this.awsRegion,
     this.awsAuthMode,
+    this.thinkingBudget,
+    this.effort,
   });
 
   Map<String, dynamic> toJson() => {
@@ -84,6 +93,8 @@ class LlmRequest {
     String? awsSecretKey,
     String? awsRegion,
     String? awsAuthMode,
+    int? thinkingBudget,
+    String? effort,
   }) => LlmRequest(
     model: model ?? this.model,
     apiKey: apiKey ?? this.apiKey,
@@ -97,6 +108,8 @@ class LlmRequest {
     awsSecretKey: awsSecretKey ?? this.awsSecretKey,
     awsRegion: awsRegion ?? this.awsRegion,
     awsAuthMode: awsAuthMode ?? this.awsAuthMode,
+    thinkingBudget: thinkingBudget ?? this.thinkingBudget,
+    effort: effort ?? this.effort,
   );
 }
 

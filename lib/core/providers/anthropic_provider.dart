@@ -37,6 +37,8 @@ class AnthropicProvider implements LlmProvider {
             request.apiKey,
             pdfsBeta: _hasDocumentBlocks(request),
             promptCaching: true,
+            interleavedThinking: request.thinkingBudget != null,
+            effortApi: request.effort != null,
           ),
           responseType: ResponseType.json,
           receiveTimeout: Duration(
@@ -69,6 +71,8 @@ class AnthropicProvider implements LlmProvider {
             request.apiKey,
             pdfsBeta: _hasDocumentBlocks(request),
             promptCaching: true,
+            interleavedThinking: request.thinkingBudget != null,
+            effortApi: request.effort != null,
           ),
           responseType: ResponseType.stream,
           receiveTimeout: Duration(
@@ -229,10 +233,14 @@ class AnthropicProvider implements LlmProvider {
     String apiKey, {
     bool pdfsBeta = false,
     bool promptCaching = false,
+    bool interleavedThinking = false,
+    bool effortApi = false,
   }) {
     final betaFeatures = <String>[];
     if (pdfsBeta) betaFeatures.add('pdfs-2024-09-25');
     if (promptCaching) betaFeatures.add('prompt-caching-2024-07-31');
+    if (interleavedThinking) betaFeatures.add('interleaved-thinking-2025-05-14');
+    if (effortApi) betaFeatures.add('effort-2025-11-24');
     return {
       'x-api-key': apiKey,
       'anthropic-version': _apiVersion,
@@ -315,12 +323,30 @@ class AnthropicProvider implements LlmProvider {
     // Anthropic supports up to 4 cache breakpoints per request.
     _applyCacheBreakpoints(messages);
 
+    final thinkingEnabled = request.thinkingBudget != null &&
+        request.thinkingBudget! >= 1024;
+
     final body = <String, dynamic>{
       'model': request.model,
       'messages': messages,
       'max_tokens': request.maxTokens,
       'stream': stream,
+      // Anthropic requires temperature=1 when extended thinking is enabled.
+      if (!thinkingEnabled) 'temperature': request.temperature,
     };
+
+    if (thinkingEnabled) {
+      body['thinking'] = {
+        'type': 'enabled',
+        'budget_tokens': request.thinkingBudget,
+      };
+    }
+
+    // Effort API (adaptive thinking) — independent of the budget thinking block.
+    // Uses output_config.effort with the effort-2025-11-24 beta header.
+    if (request.effort != null) {
+      body['output_config'] = {'effort': request.effort};
+    }
 
     if (system != null && system.isNotEmpty) {
       // Use the block format required for cache_control on the system prompt.

@@ -16,6 +16,8 @@ import 'package:flutterclaw/core/providers/error_parser.dart';
 import 'package:flutterclaw/core/providers/provider_interface.dart';
 import 'package:flutterclaw/data/models/agent_profile.dart';
 import 'package:flutterclaw/data/models/config.dart';
+import 'package:flutterclaw/data/models/model_catalog.dart';
+import 'package:flutterclaw/services/hook_runner.dart';
 import 'package:flutterclaw/services/ui_automation_service.dart';
 import 'package:flutterclaw/tools/registry.dart';
 import 'package:logging/logging.dart';
@@ -88,6 +90,9 @@ class AgentLoop {
   /// (ChatNotifier, channels, subagents). Use for overlay/notification.
   ToolStatusCallback? onToolStatus;
 
+  /// Optional hook runner for session lifecycle events.
+  HookRunner? hookRunner;
+
   AgentLoop({
     required this.configManager,
     required this.providerRouter,
@@ -95,6 +100,7 @@ class AgentLoop {
     required this.sessionManager,
     this.skillsPromptGetter,
     this.onToolStatus,
+    this.hookRunner,
   });
 
   // Cached device info for system prompt injection
@@ -365,6 +371,7 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
     List<Map<String, dynamic>>? contentBlocks,
     Map<String, dynamic>? channelContext,
   }) async {
+    await hookRunner?.runLifecycle(HookEvent.sessionStart, sessionKey);
     await sessionManager.getOrCreate(sessionKey, channelType, chatId);
     final session = sessionManager.getSession(sessionKey);
     // Use the agent that owns this session (e.g. Agent B when B is being called)
@@ -487,6 +494,21 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
     const maxContinuations = 2; // up to 3 rounds × maxToolIterations total
     final provCred = configManager.config.providerCredentials[modelEntry.provider];
 
+    // Resolve thinking/effort settings: keyword detection → session level → model default.
+    final sessionMeta = sessionManager.getMeta(sessionKey);
+    final turnKeyword = _detectThinkingKeyword(message);
+    final thinkingLevel = _resolveThinkingLevel(
+      sessionMeta?.thinkingLevel,
+      modelEntry,
+      turnOverride: turnKeyword,
+    );
+    final thinking = _buildThinkingParams(thinkingLevel, modelEntry);
+
+    // Look up CatalogModel for cost tracking.
+    final catalogModel = ModelCatalog.models
+        .where((m) => m.id == modelEntry.model)
+        .firstOrNull;
+
     continuation: while (true) {
       var maxIter = maxToolIterations;
 
@@ -504,6 +526,8 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
           awsSecretKey: provCred?.awsSecretKey,
           awsRegion: provCred?.awsRegion,
           awsAuthMode: provCred?.awsAuthMode,
+          thinkingBudget: thinking.thinkingBudget,
+          effort: thinking.effort,
         );
 
         LlmResponse response;
@@ -540,7 +564,15 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
 
         if (response.usage != null) {
           totalUsage = _mergeUsage(totalUsage, response.usage!);
-          await sessionManager.updateTokens(sessionKey, response.usage!);
+          final costUsd = catalogModel?.computeCostUsd(
+                inputTokens: response.usage!.promptTokens,
+                outputTokens: response.usage!.completionTokens,
+                cacheReadTokens: response.usage!.cacheReadTokens,
+                cacheWriteTokens: response.usage!.cacheWriteTokens,
+              ) ??
+              0.0;
+          await sessionManager.updateTokens(sessionKey, response.usage!,
+              costUsd: costUsd);
         }
 
         if (response.toolCalls != null && response.toolCalls!.isNotEmpty) {
@@ -669,6 +701,7 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
       (m) => m.role == 'assistant',
       orElse: () => const LlmMessage(role: 'assistant', content: ''),
     );
+    await hookRunner?.runLifecycle(HookEvent.sessionStop, sessionKey);
     return AgentResponse(
       content: lastAssistant.content is String
           ? lastAssistant.content as String
@@ -815,6 +848,21 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
     const maxContinuations = 2; // up to 3 rounds × maxToolIterations total
     final provCredStream = configManager.config.providerCredentials[modelEntry.provider];
 
+    // Resolve thinking/effort settings: keyword detection → session level → model default.
+    final sessionMetaStream = sessionManager.getMeta(sessionKey);
+    final turnKeywordStream = _detectThinkingKeyword(message);
+    final thinkingLevelStream = _resolveThinkingLevel(
+      sessionMetaStream?.thinkingLevel,
+      modelEntry,
+      turnOverride: turnKeywordStream,
+    );
+    final thinkingStream = _buildThinkingParams(thinkingLevelStream, modelEntry);
+
+    // Look up CatalogModel for cost tracking.
+    final catalogModelStream = ModelCatalog.models
+        .where((m) => m.id == modelEntry.model)
+        .firstOrNull;
+
     continuation: while (true) {
       var maxIter = maxToolIterations;
 
@@ -833,6 +881,8 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
           awsSecretKey: provCredStream?.awsSecretKey,
           awsRegion: provCredStream?.awsRegion,
           awsAuthMode: provCredStream?.awsAuthMode,
+          thinkingBudget: thinkingStream.thinkingBudget,
+          effort: thinkingStream.effort,
         );
 
         final toolCallsBuffer = <ToolCall>[];
@@ -893,7 +943,15 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
         }
 
         if (totalUsage != null) {
-          await sessionManager.updateTokens(sessionKey, totalUsage);
+          final costUsd = catalogModelStream?.computeCostUsd(
+                inputTokens: totalUsage.promptTokens,
+                outputTokens: totalUsage.completionTokens,
+                cacheReadTokens: totalUsage.cacheReadTokens,
+                cacheWriteTokens: totalUsage.cacheWriteTokens,
+              ) ??
+              0.0;
+          await sessionManager.updateTokens(sessionKey, totalUsage,
+              costUsd: costUsd);
         }
 
         if (toolCallsBuffer.isNotEmpty) {
@@ -1666,6 +1724,106 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
       totalTokens: a.totalTokens + b.totalTokens,
     );
   }
+
+  /// Resolves the effective thinking level for a request.
+  ///
+  /// Priority order:
+  /// 1. Turn-level keyword override (think / think harder / ultrathink)
+  /// 2. Session-level explicit setting (/think command)
+  /// 3. Model default for adaptive-thinking models (uses CatalogModel.defaultEffort)
+  /// 4. null → no thinking for non-Anthropic models
+  String? _resolveThinkingLevel(
+    String? sessionLevel,
+    ModelEntry modelEntry, {
+    String? turnOverride,
+  }) {
+    // Turn-level keyword takes highest priority
+    if (turnOverride != null) return turnOverride;
+
+    // Session-level explicit ('off' means the user disabled it)
+    if (sessionLevel != null) {
+      return sessionLevel == 'off' ? null : sessionLevel;
+    }
+
+    // For models with adaptive thinking, use the model's default effort level
+    final catalog = ModelCatalog.models
+        .where((m) => m.id == modelEntry.model)
+        .firstOrNull;
+    if (catalog != null && catalog.supportsAdaptiveThinking) {
+      return catalog.defaultEffort;
+    }
+
+    return null;
+  }
+
+  /// Detects thinking keyword triggers in a user message.
+  ///
+  /// Returns a one-turn effort override, or null if no keyword is present.
+  /// Mirrors OpenClaw's keyword detection: "think" → medium, "think harder"
+  /// / "think more" → high, "ultrathink" → high, "don't think" → off.
+  String? _detectThinkingKeyword(String message) {
+    final lower = message.toLowerCase();
+    // Negative first so "don't think harder" doesn't trigger high
+    if (RegExp(r"\bdon'?t\s+think\b").hasMatch(lower) ||
+        RegExp(r'\bno\s+thinking\b').hasMatch(lower) ||
+        RegExp(r'\bstop\s+thinking\b').hasMatch(lower)) {
+      return 'off';
+    }
+    if (lower.contains('ultrathink') ||
+        RegExp(r'\bthink\s+(harder|more|deeply|carefully)\b').hasMatch(lower) ||
+        RegExp(r'\bthink\s+a\s+lot\b').hasMatch(lower)) {
+      return 'high';
+    }
+    if (RegExp(r'\bthink\b').hasMatch(lower) ||
+        RegExp(r'\breason\s+(through|about)\b').hasMatch(lower)) {
+      return 'medium';
+    }
+    return null;
+  }
+
+  /// Builds thinking params for the LlmRequest based on the resolved level
+  /// and the model's thinking capabilities.
+  ///
+  /// For adaptive-thinking models: sets [effort] (Anthropic effort API).
+  /// For extended-thinking-only models: sets [thinkingBudget].
+  /// For other models: sets [effort] as OpenAI reasoning_effort.
+  ({int? thinkingBudget, String? effort}) _buildThinkingParams(
+    String? level,
+    ModelEntry modelEntry,
+  ) {
+    if (level == null || level == 'off') {
+      return (thinkingBudget: null, effort: null);
+    }
+
+    final catalog = ModelCatalog.models
+        .where((m) => m.id == modelEntry.model)
+        .firstOrNull;
+
+    final isAnthropicProvider = modelEntry.provider == 'anthropic' ||
+        modelEntry.provider == 'bedrock';
+
+    if (isAnthropicProvider) {
+      if (catalog?.supportsAdaptiveThinking == true) {
+        // Use the modern effort API — model decides thinking budget adaptively
+        return (thinkingBudget: null, effort: level);
+      } else if (catalog?.supportsExtendedThinking == true) {
+        // Older extended thinking: explicit budget
+        final budget = switch (level) {
+          'low' => 1024,
+          'medium' => 5000,
+          'high' => 16000,
+          _ => null,
+        };
+        return (thinkingBudget: budget, effort: null);
+      }
+    } else {
+      // OpenAI o-series: reasoning_effort
+      return (thinkingBudget: null, effort: level);
+    }
+
+    return (thinkingBudget: null, effort: null);
+  }
+
 
   String _getLanguageName(String languageCode) {
     const languageNames = {

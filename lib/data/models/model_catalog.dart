@@ -34,6 +34,35 @@ class CatalogModel {
   /// Input modalities: 'text', 'image', 'audio'.
   final List<String> input;
 
+  /// Price per million INPUT tokens in USD (0 = free or unknown).
+  final double inputPriceUsdPerMillion;
+  /// Price per million OUTPUT tokens in USD (0 = free or unknown).
+  final double outputPriceUsdPerMillion;
+  /// Price per million cache-READ tokens in USD (Anthropic only).
+  final double cacheReadPriceUsdPerMillion;
+  /// Price per million cache-WRITE tokens in USD (Anthropic only).
+  final double cacheWritePriceUsdPerMillion;
+
+  /// True when this model supports the Anthropic **effort API**
+  /// (`output_config.effort` + beta `effort-2025-11-24`).
+  ///
+  /// These models implement *adaptive thinking*: the model decides its own
+  /// thinking allocation based on task complexity within the effort envelope.
+  /// Available on Claude Haiku/Sonnet/Opus 4.5+ and 4.6+.
+  final bool supportsAdaptiveThinking;
+
+  /// True when this model supports classic **extended thinking** with an
+  /// explicit budget (`thinking.budget_tokens` + beta
+  /// `interleaved-thinking-2025-05-14`).
+  ///
+  /// For models that also have [supportsAdaptiveThinking], the effort API is
+  /// preferred — this flag is kept for explicit-budget use cases only.
+  final bool supportsExtendedThinking;
+
+  /// Default effort level when [supportsAdaptiveThinking] is true and the user
+  /// hasn't set an explicit level. 'medium' is a good default per Anthropic.
+  final String defaultEffort;
+
   const CatalogModel({
     required this.id,
     required this.displayName,
@@ -42,10 +71,31 @@ class CatalogModel {
     required this.contextWindow,
     this.description,
     this.input = const ['text'],
+    this.inputPriceUsdPerMillion = 0,
+    this.outputPriceUsdPerMillion = 0,
+    this.cacheReadPriceUsdPerMillion = 0,
+    this.cacheWritePriceUsdPerMillion = 0,
+    this.supportsAdaptiveThinking = false,
+    this.supportsExtendedThinking = false,
+    this.defaultEffort = 'medium',
   });
 
   bool get supportsVision => input.contains('image');
   bool get supportsAudio => input.contains('audio');
+  bool get hasPricing => inputPriceUsdPerMillion > 0 || outputPriceUsdPerMillion > 0;
+
+  /// Compute USD cost for a set of token counts.
+  double computeCostUsd({
+    required int inputTokens,
+    required int outputTokens,
+    int cacheReadTokens = 0,
+    int cacheWriteTokens = 0,
+  }) {
+    return (inputTokens / 1e6) * inputPriceUsdPerMillion
+        + (outputTokens / 1e6) * outputPriceUsdPerMillion
+        + (cacheReadTokens / 1e6) * cacheReadPriceUsdPerMillion
+        + (cacheWriteTokens / 1e6) * cacheWritePriceUsdPerMillion;
+  }
 }
 
 class ModelCatalog {
@@ -200,6 +250,8 @@ class ModelCatalog {
       isFree: false,
       contextWindow: 1048576,
       input: ['text', 'image'],
+      inputPriceUsdPerMillion: 2.00,
+      outputPriceUsdPerMillion: 8.00,
     ),
     CatalogModel(
       id: 'gpt-4o',
@@ -208,6 +260,8 @@ class ModelCatalog {
       isFree: false,
       contextWindow: 128000,
       input: ['text', 'image'],
+      inputPriceUsdPerMillion: 2.50,
+      outputPriceUsdPerMillion: 10.00,
     ),
     CatalogModel(
       id: 'o4-mini',
@@ -217,6 +271,8 @@ class ModelCatalog {
       contextWindow: 200000,
       description: 'Fast reasoning model',
       input: ['text', 'image'],
+      inputPriceUsdPerMillion: 1.10,
+      outputPriceUsdPerMillion: 4.40,
     ),
 
     // Anthropic
@@ -228,6 +284,12 @@ class ModelCatalog {
       contextWindow: 200000,
       description: 'Fastest Claude — low cost',
       input: ['text', 'image'],
+      inputPriceUsdPerMillion: 0.80,
+      outputPriceUsdPerMillion: 4.00,
+      cacheReadPriceUsdPerMillion: 0.08,
+      cacheWritePriceUsdPerMillion: 1.00,
+      supportsAdaptiveThinking: true,
+      defaultEffort: 'low',
     ),
     CatalogModel(
       id: 'claude-sonnet-4-5-20250514',
@@ -236,6 +298,12 @@ class ModelCatalog {
       isFree: false,
       contextWindow: 200000,
       input: ['text', 'image'],
+      inputPriceUsdPerMillion: 3.00,
+      outputPriceUsdPerMillion: 15.00,
+      cacheReadPriceUsdPerMillion: 0.30,
+      cacheWritePriceUsdPerMillion: 3.75,
+      supportsAdaptiveThinking: true,
+      defaultEffort: 'medium',
     ),
     CatalogModel(
       id: 'claude-sonnet-4-6',
@@ -245,6 +313,12 @@ class ModelCatalog {
       contextWindow: 1000000,
       description: 'Latest Sonnet — 1M context, balanced (Claude API ID per Anthropic docs)',
       input: ['text', 'image'],
+      inputPriceUsdPerMillion: 3.00,
+      outputPriceUsdPerMillion: 15.00,
+      cacheReadPriceUsdPerMillion: 0.30,
+      cacheWritePriceUsdPerMillion: 3.75,
+      supportsAdaptiveThinking: true,
+      defaultEffort: 'medium',
     ),
     CatalogModel(
       id: 'claude-opus-4-6',
@@ -254,6 +328,12 @@ class ModelCatalog {
       contextWindow: 1000000,
       description: 'Most capable Claude — 1M context (Claude API ID per Anthropic docs)',
       input: ['text', 'image'],
+      inputPriceUsdPerMillion: 15.00,
+      outputPriceUsdPerMillion: 75.00,
+      cacheReadPriceUsdPerMillion: 1.50,
+      cacheWritePriceUsdPerMillion: 18.75,
+      supportsAdaptiveThinking: true,
+      defaultEffort: 'medium',
     ),
 
     // AWS Bedrock (Anthropic Claude)
@@ -265,6 +345,8 @@ class ModelCatalog {
       contextWindow: 200000,
       description: 'Most capable Claude via Bedrock',
       input: ['text', 'image'],
+      supportsAdaptiveThinking: true,
+      defaultEffort: 'medium',
     ),
     CatalogModel(
       id: 'us.anthropic.claude-sonnet-4-6',
@@ -274,6 +356,8 @@ class ModelCatalog {
       contextWindow: 200000,
       description: 'Sonnet 4.6 via Bedrock — balanced speed and capability',
       input: ['text', 'image'],
+      supportsAdaptiveThinking: true,
+      defaultEffort: 'medium',
     ),
     CatalogModel(
       id: 'us.anthropic.claude-opus-4-5-20251101-v1:0',
@@ -283,6 +367,8 @@ class ModelCatalog {
       contextWindow: 200000,
       description: 'Opus 4.5 via Bedrock — advanced reasoning',
       input: ['text', 'image'],
+      supportsAdaptiveThinking: true,
+      defaultEffort: 'high',
     ),
     CatalogModel(
       id: 'us.anthropic.claude-sonnet-4-5-20250929-v1:0',
@@ -292,6 +378,8 @@ class ModelCatalog {
       contextWindow: 200000,
       description: 'Sonnet 4.5 via Bedrock — balanced speed and capability',
       input: ['text', 'image'],
+      supportsAdaptiveThinking: true,
+      defaultEffort: 'medium',
     ),
     CatalogModel(
       id: 'us.anthropic.claude-haiku-4-5-20251001-v1:0',
@@ -301,6 +389,8 @@ class ModelCatalog {
       contextWindow: 200000,
       description: 'Fastest Claude via Bedrock — low cost',
       input: ['text', 'image'],
+      supportsAdaptiveThinking: true,
+      defaultEffort: 'low',
     ),
 
     // xAI
