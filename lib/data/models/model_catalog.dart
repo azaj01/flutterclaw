@@ -34,6 +34,15 @@ class CatalogModel {
   /// Input modalities: 'text', 'image', 'audio'.
   final List<String> input;
 
+  /// Price per million INPUT tokens in USD (0 = free or unknown).
+  final double inputPriceUsdPerMillion;
+  /// Price per million OUTPUT tokens in USD (0 = free or unknown).
+  final double outputPriceUsdPerMillion;
+  /// Price per million cache-READ tokens in USD (Anthropic only).
+  final double cacheReadPriceUsdPerMillion;
+  /// Price per million cache-WRITE tokens in USD (Anthropic only).
+  final double cacheWritePriceUsdPerMillion;
+
   const CatalogModel({
     required this.id,
     required this.displayName,
@@ -42,10 +51,28 @@ class CatalogModel {
     required this.contextWindow,
     this.description,
     this.input = const ['text'],
+    this.inputPriceUsdPerMillion = 0,
+    this.outputPriceUsdPerMillion = 0,
+    this.cacheReadPriceUsdPerMillion = 0,
+    this.cacheWritePriceUsdPerMillion = 0,
   });
 
   bool get supportsVision => input.contains('image');
   bool get supportsAudio => input.contains('audio');
+  bool get hasPricing => inputPriceUsdPerMillion > 0 || outputPriceUsdPerMillion > 0;
+
+  /// Compute USD cost for a set of token counts.
+  double computeCostUsd({
+    required int inputTokens,
+    required int outputTokens,
+    int cacheReadTokens = 0,
+    int cacheWriteTokens = 0,
+  }) {
+    return (inputTokens / 1e6) * inputPriceUsdPerMillion
+        + (outputTokens / 1e6) * outputPriceUsdPerMillion
+        + (cacheReadTokens / 1e6) * cacheReadPriceUsdPerMillion
+        + (cacheWriteTokens / 1e6) * cacheWritePriceUsdPerMillion;
+  }
 }
 
 class ModelCatalog {
@@ -200,6 +227,8 @@ class ModelCatalog {
       isFree: false,
       contextWindow: 1048576,
       input: ['text', 'image'],
+      inputPriceUsdPerMillion: 2.00,
+      outputPriceUsdPerMillion: 8.00,
     ),
     CatalogModel(
       id: 'gpt-4o',
@@ -208,6 +237,8 @@ class ModelCatalog {
       isFree: false,
       contextWindow: 128000,
       input: ['text', 'image'],
+      inputPriceUsdPerMillion: 2.50,
+      outputPriceUsdPerMillion: 10.00,
     ),
     CatalogModel(
       id: 'o4-mini',
@@ -217,6 +248,8 @@ class ModelCatalog {
       contextWindow: 200000,
       description: 'Fast reasoning model',
       input: ['text', 'image'],
+      inputPriceUsdPerMillion: 1.10,
+      outputPriceUsdPerMillion: 4.40,
     ),
 
     // Anthropic
@@ -228,6 +261,10 @@ class ModelCatalog {
       contextWindow: 200000,
       description: 'Fastest Claude — low cost',
       input: ['text', 'image'],
+      inputPriceUsdPerMillion: 0.80,
+      outputPriceUsdPerMillion: 4.00,
+      cacheReadPriceUsdPerMillion: 0.08,
+      cacheWritePriceUsdPerMillion: 1.00,
     ),
     CatalogModel(
       id: 'claude-sonnet-4-5-20250514',
@@ -236,6 +273,10 @@ class ModelCatalog {
       isFree: false,
       contextWindow: 200000,
       input: ['text', 'image'],
+      inputPriceUsdPerMillion: 3.00,
+      outputPriceUsdPerMillion: 15.00,
+      cacheReadPriceUsdPerMillion: 0.30,
+      cacheWritePriceUsdPerMillion: 3.75,
     ),
     CatalogModel(
       id: 'claude-sonnet-4-6',
@@ -245,6 +286,10 @@ class ModelCatalog {
       contextWindow: 1000000,
       description: 'Latest Sonnet — 1M context, balanced (Claude API ID per Anthropic docs)',
       input: ['text', 'image'],
+      inputPriceUsdPerMillion: 3.00,
+      outputPriceUsdPerMillion: 15.00,
+      cacheReadPriceUsdPerMillion: 0.30,
+      cacheWritePriceUsdPerMillion: 3.75,
     ),
     CatalogModel(
       id: 'claude-opus-4-6',
@@ -254,6 +299,10 @@ class ModelCatalog {
       contextWindow: 1000000,
       description: 'Most capable Claude — 1M context (Claude API ID per Anthropic docs)',
       input: ['text', 'image'],
+      inputPriceUsdPerMillion: 15.00,
+      outputPriceUsdPerMillion: 75.00,
+      cacheReadPriceUsdPerMillion: 1.50,
+      cacheWritePriceUsdPerMillion: 18.75,
     ),
 
     // AWS Bedrock (Anthropic Claude)

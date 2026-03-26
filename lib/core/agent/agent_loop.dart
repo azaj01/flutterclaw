@@ -16,6 +16,8 @@ import 'package:flutterclaw/core/providers/error_parser.dart';
 import 'package:flutterclaw/core/providers/provider_interface.dart';
 import 'package:flutterclaw/data/models/agent_profile.dart';
 import 'package:flutterclaw/data/models/config.dart';
+import 'package:flutterclaw/data/models/model_catalog.dart';
+import 'package:flutterclaw/services/hook_runner.dart';
 import 'package:flutterclaw/services/ui_automation_service.dart';
 import 'package:flutterclaw/tools/registry.dart';
 import 'package:logging/logging.dart';
@@ -88,6 +90,9 @@ class AgentLoop {
   /// (ChatNotifier, channels, subagents). Use for overlay/notification.
   ToolStatusCallback? onToolStatus;
 
+  /// Optional hook runner for session lifecycle events.
+  HookRunner? hookRunner;
+
   AgentLoop({
     required this.configManager,
     required this.providerRouter,
@@ -95,6 +100,7 @@ class AgentLoop {
     required this.sessionManager,
     this.skillsPromptGetter,
     this.onToolStatus,
+    this.hookRunner,
   });
 
   // Cached device info for system prompt injection
@@ -365,6 +371,7 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
     List<Map<String, dynamic>>? contentBlocks,
     Map<String, dynamic>? channelContext,
   }) async {
+    await hookRunner?.runLifecycle(HookEvent.sessionStart, sessionKey);
     await sessionManager.getOrCreate(sessionKey, channelType, chatId);
     final session = sessionManager.getSession(sessionKey);
     // Use the agent that owns this session (e.g. Agent B when B is being called)
@@ -487,6 +494,17 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
     const maxContinuations = 2; // up to 3 rounds × maxToolIterations total
     final provCred = configManager.config.providerCredentials[modelEntry.provider];
 
+    // Resolve thinking/effort settings from session meta.
+    final sessionMeta = sessionManager.getMeta(sessionKey);
+    final thinkingLevel = sessionMeta?.thinkingLevel;
+    final thinkingBudget = _thinkingBudgetForLevel(thinkingLevel);
+    final effortLevel = _effortForLevel(thinkingLevel);
+
+    // Look up CatalogModel for cost tracking.
+    final catalogModel = ModelCatalog.models
+        .where((m) => m.id == modelEntry.model)
+        .firstOrNull;
+
     continuation: while (true) {
       var maxIter = maxToolIterations;
 
@@ -504,6 +522,8 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
           awsSecretKey: provCred?.awsSecretKey,
           awsRegion: provCred?.awsRegion,
           awsAuthMode: provCred?.awsAuthMode,
+          thinkingBudget: thinkingBudget,
+          effort: effortLevel,
         );
 
         LlmResponse response;
@@ -540,7 +560,15 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
 
         if (response.usage != null) {
           totalUsage = _mergeUsage(totalUsage, response.usage!);
-          await sessionManager.updateTokens(sessionKey, response.usage!);
+          final costUsd = catalogModel?.computeCostUsd(
+                inputTokens: response.usage!.promptTokens,
+                outputTokens: response.usage!.completionTokens,
+                cacheReadTokens: response.usage!.cacheReadTokens,
+                cacheWriteTokens: response.usage!.cacheWriteTokens,
+              ) ??
+              0.0;
+          await sessionManager.updateTokens(sessionKey, response.usage!,
+              costUsd: costUsd);
         }
 
         if (response.toolCalls != null && response.toolCalls!.isNotEmpty) {
@@ -669,6 +697,7 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
       (m) => m.role == 'assistant',
       orElse: () => const LlmMessage(role: 'assistant', content: ''),
     );
+    await hookRunner?.runLifecycle(HookEvent.sessionStop, sessionKey);
     return AgentResponse(
       content: lastAssistant.content is String
           ? lastAssistant.content as String
@@ -815,6 +844,17 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
     const maxContinuations = 2; // up to 3 rounds × maxToolIterations total
     final provCredStream = configManager.config.providerCredentials[modelEntry.provider];
 
+    // Resolve thinking/effort settings from session meta.
+    final sessionMetaStream = sessionManager.getMeta(sessionKey);
+    final thinkingLevelStream = sessionMetaStream?.thinkingLevel;
+    final thinkingBudgetStream = _thinkingBudgetForLevel(thinkingLevelStream);
+    final effortLevelStream = _effortForLevel(thinkingLevelStream);
+
+    // Look up CatalogModel for cost tracking.
+    final catalogModelStream = ModelCatalog.models
+        .where((m) => m.id == modelEntry.model)
+        .firstOrNull;
+
     continuation: while (true) {
       var maxIter = maxToolIterations;
 
@@ -833,6 +873,8 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
           awsSecretKey: provCredStream?.awsSecretKey,
           awsRegion: provCredStream?.awsRegion,
           awsAuthMode: provCredStream?.awsAuthMode,
+          thinkingBudget: thinkingBudgetStream,
+          effort: effortLevelStream,
         );
 
         final toolCallsBuffer = <ToolCall>[];
@@ -893,7 +935,15 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
         }
 
         if (totalUsage != null) {
-          await sessionManager.updateTokens(sessionKey, totalUsage);
+          final costUsd = catalogModelStream?.computeCostUsd(
+                inputTokens: totalUsage.promptTokens,
+                outputTokens: totalUsage.completionTokens,
+                cacheReadTokens: totalUsage.cacheReadTokens,
+                cacheWriteTokens: totalUsage.cacheWriteTokens,
+              ) ??
+              0.0;
+          await sessionManager.updateTokens(sessionKey, totalUsage,
+              costUsd: costUsd);
         }
 
         if (toolCallsBuffer.isNotEmpty) {
@@ -1665,6 +1715,28 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
       completionTokens: a.completionTokens + b.completionTokens,
       totalTokens: a.totalTokens + b.totalTokens,
     );
+  }
+
+  /// Maps a thinking level string to an Anthropic thinking budget token count.
+  /// Returns null when thinking is disabled.
+  int? _thinkingBudgetForLevel(String? level) {
+    switch (level) {
+      case 'low': return 1024;
+      case 'medium': return 5000;
+      case 'high': return 16000;
+      default: return null; // null/off = no thinking
+    }
+  }
+
+  /// Maps a thinking level string to an OpenAI reasoning_effort value.
+  /// Returns null when thinking is disabled.
+  String? _effortForLevel(String? level) {
+    switch (level) {
+      case 'low': return 'low';
+      case 'medium': return 'medium';
+      case 'high': return 'high';
+      default: return null;
+    }
   }
 
   String _getLanguageName(String languageCode) {

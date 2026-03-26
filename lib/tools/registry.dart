@@ -8,6 +8,8 @@ import 'package:logging/logging.dart';
 
 import '../core/agent/token_budget_manager.dart';
 import '../data/models/config.dart';
+import '../services/hook_runner.dart';
+import '../services/security_scanner.dart';
 
 final _log = Logger('flutterclaw.tool_registry');
 
@@ -80,6 +82,15 @@ class ToolRegistry {
 
   /// Config manager for accessing model context limits.
   ConfigManager? _configManager;
+
+  final _scanner = SecurityScanner();
+
+  /// Optional hook runner. Set via [setHookRunner] after construction.
+  HookRunner? _hookRunner;
+
+  void setHookRunner(HookRunner runner) {
+    _hookRunner = runner;
+  }
 
   /// Set the config manager (called during initialization).
   void setConfigManager(ConfigManager manager) {
@@ -165,7 +176,37 @@ class ToolRegistry {
       return ToolResult.error('Tool "$name" not found or expired');
     }
 
+    final scan = _scanner.scan(name, args);
+    if (scan.hasBlock) {
+      final msg = scan.blocks.map((i) => i.description).join('; ');
+      _log.warning('Security block on $name: $msg');
+      return ToolResult.error(
+          'Security policy blocked "$name": $msg\n\n'
+          'This pattern matches a known dangerous operation. '
+          'If this is intentional, rephrase the request to avoid the blocked pattern.');
+    }
+    if (scan.warnings.isNotEmpty) {
+      final msg = scan.warnings.map((i) => i.description).join('; ');
+      _log.info('Security warning on $name: $msg');
+    }
+
+    if (_hookRunner != null) {
+      final hookResult = await _hookRunner!.runPreToolUse(name, args);
+      if (!hookResult.allow) {
+        return ToolResult.error(
+            'Hook blocked "$name": ${hookResult.message ?? 'blocked by hook'}');
+      }
+    }
+
     final result = await tool.execute(args);
+
+    if (_hookRunner != null) {
+      await _hookRunner!.runPostToolUse(
+        name,
+        result.content,
+        isError: result.isError,
+      );
+    }
 
     // Apply truncation middleware if needed
     return _maybeTruncateResult(name, result);
@@ -191,6 +232,28 @@ class ToolRegistry {
     final tool = get(name);
     if (tool == null) {
       return ToolResult.error('Tool "$name" not found or expired');
+    }
+
+    final scan = _scanner.scan(name, args);
+    if (scan.hasBlock) {
+      final msg = scan.blocks.map((i) => i.description).join('; ');
+      _log.warning('Security block on $name: $msg');
+      return ToolResult.error(
+          'Security policy blocked "$name": $msg\n\n'
+          'This pattern matches a known dangerous operation. '
+          'If this is intentional, rephrase the request to avoid the blocked pattern.');
+    }
+    if (scan.warnings.isNotEmpty) {
+      _log.info('Security warning on $name: '
+          '${scan.warnings.map((i) => i.description).join('; ')}');
+    }
+
+    if (_hookRunner != null) {
+      final hookResult = await _hookRunner!.runPreToolUse(name, args);
+      if (!hookResult.allow) {
+        return ToolResult.error(
+            'Hook blocked "$name": ${hookResult.message ?? 'blocked by hook'}');
+      }
     }
 
     ToolResult result;

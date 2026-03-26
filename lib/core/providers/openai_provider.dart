@@ -301,6 +301,10 @@ class OpenAiProvider implements LlmProvider {
     // o-series reasoning models use max_completion_tokens and don't support temperature.
     if (reasoning) {
       body['max_completion_tokens'] = request.maxTokens;
+      // reasoning_effort: 'low' | 'medium' | 'high' (default 'medium' if omitted)
+      if (request.effort != null) {
+        body['reasoning_effort'] = request.effort;
+      }
     } else {
       body['max_tokens'] = request.maxTokens;
       body['temperature'] = request.temperature;

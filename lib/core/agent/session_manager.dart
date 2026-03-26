@@ -91,6 +91,8 @@ class SessionMeta {
   int cacheReadTokens;
   /// Tokens written into Anthropic prompt cache (billed at ~125% normal rate).
   int cacheWriteTokens;
+  /// Accumulated cost in USD for all API calls in this session.
+  double totalCostUsd;
   DateTime lastActivity;
   String? modelOverride;
   int messageCount;
@@ -98,6 +100,8 @@ class SessionMeta {
   String? displayName;
   /// Short snippet from the last user or assistant message for list preview.
   String? lastPreview;
+  /// Extended thinking level for this session: null | 'off' | 'low' | 'medium' | 'high'
+  String? thinkingLevel;
 
   SessionMeta({
     required this.key,
@@ -109,11 +113,13 @@ class SessionMeta {
     this.outputTokens = 0,
     this.cacheReadTokens = 0,
     this.cacheWriteTokens = 0,
+    this.totalCostUsd = 0.0,
     DateTime? lastActivity,
     this.modelOverride,
     this.messageCount = 0,
     this.displayName,
     this.lastPreview,
+    this.thinkingLevel,
   })  : sessionId = sessionId ?? _uuid.v4(),
         lastActivity = lastActivity ?? DateTime.now();
 
@@ -134,11 +140,13 @@ class SessionMeta {
         'outputTokens': outputTokens,
         if (cacheReadTokens > 0) 'cacheReadTokens': cacheReadTokens,
         if (cacheWriteTokens > 0) 'cacheWriteTokens': cacheWriteTokens,
+        if (totalCostUsd > 0) 'totalCostUsd': totalCostUsd,
         'lastActivity': lastActivity.toIso8601String(),
         if (modelOverride != null) 'modelOverride': modelOverride,
         'messageCount': messageCount,
         if (displayName != null) 'displayName': displayName,
         if (lastPreview != null) 'lastPreview': lastPreview,
+        if (thinkingLevel != null) 'thinkingLevel': thinkingLevel,
       };
 
   factory SessionMeta.fromJson(Map<String, dynamic> json) => SessionMeta(
@@ -151,6 +159,7 @@ class SessionMeta {
         outputTokens: json['outputTokens'] as int? ?? 0,
         cacheReadTokens: json['cacheReadTokens'] as int? ?? 0,
         cacheWriteTokens: json['cacheWriteTokens'] as int? ?? 0,
+        totalCostUsd: (json['totalCostUsd'] as num?)?.toDouble() ?? 0.0,
         lastActivity: json['lastActivity'] != null
             ? DateTime.parse(json['lastActivity'] as String)
             : DateTime.now(),
@@ -158,6 +167,7 @@ class SessionMeta {
         messageCount: json['messageCount'] as int? ?? 0,
         displayName: json['displayName'] as String?,
         lastPreview: json['lastPreview'] as String?,
+        thinkingLevel: json['thinkingLevel'] as String?,
       );
 }
 
@@ -459,6 +469,9 @@ class SessionManager {
     _log.info('Compact requested for $key (use AgentLoop.compactSession)');
   }
 
+  /// Returns the metadata for a session key, or null if not found.
+  SessionMeta? getMeta(String key) => _meta[key];
+
   List<SessionMeta> listSessions() => _meta.values.toList();
 
   /// Returns only sessions active within [_kSessionActiveTtl], sorted by
@@ -483,7 +496,11 @@ class SessionManager {
     );
   }
 
-  Future<void> updateTokens(String key, UsageInfo usage) async {
+  Future<void> updateTokens(
+    String key,
+    UsageInfo usage, {
+    double costUsd = 0.0,
+  }) async {
     final meta = _meta[key];
     if (meta == null) return;
     meta.totalTokens += usage.totalTokens;
@@ -491,6 +508,7 @@ class SessionManager {
     meta.outputTokens += usage.completionTokens;
     meta.cacheReadTokens += usage.cacheReadTokens;
     meta.cacheWriteTokens += usage.cacheWriteTokens;
+    meta.totalCostUsd += costUsd;
     meta.lastActivity = DateTime.now();
     final dir = await _getSessionsDir();
     await _saveStore(dir);
@@ -503,6 +521,124 @@ class SessionManager {
     meta.lastActivity = DateTime.now();
     final dir = await _getSessionsDir();
     await _saveStore(dir);
+  }
+
+  /// Set the extended thinking level for a session.
+  Future<void> setThinkingLevel(String key, String? level) async {
+    final meta = _meta[key];
+    if (meta == null) return;
+    meta.thinkingLevel = level;
+    meta.lastActivity = DateTime.now();
+    final dir = await _getSessionsDir();
+    await _saveStore(dir);
+  }
+
+  /// Remove the last [n] user-initiated exchanges (user+assistant pairs) from
+  /// the context cache and record the rewind in the transcript.
+  ///
+  /// Returns the number of messages actually removed (0 if nothing to rewind).
+  Future<int> rewind(String key, int n) async {
+    final meta = _meta[key];
+    if (meta == null || n <= 0) return 0;
+
+    final messages = List<LlmMessage>.from(_contextCache[key] ?? []);
+    if (messages.isEmpty) return 0;
+
+    // Walk backwards to find the start of the nth user exchange.
+    var exchangesFound = 0;
+    var cutoffIndex = messages.length;
+    for (var i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role == 'user') {
+        exchangesFound++;
+        if (exchangesFound == n) {
+          cutoffIndex = i;
+          break;
+        }
+      }
+    }
+    if (cutoffIndex == messages.length) return 0; // nothing to cut
+
+    final removedCount = messages.length - cutoffIndex;
+    _contextCache[key] = messages.sublist(0, cutoffIndex);
+
+    final dir = await _getSessionsDir();
+    final entry = TranscriptEntry(
+      type: 'rewind',
+      data: {
+        'cutoffMessageCount': cutoffIndex,
+        'removedCount': removedCount,
+      },
+    );
+    await _appendToTranscript(dir, meta.sessionId, entry);
+    meta.lastActivity = DateTime.now();
+    await _saveStore(dir);
+    _sessionsChangedController.add(null);
+    _log.info('Rewind $key: removed $removedCount messages');
+    return removedCount;
+  }
+
+  /// Fork the current session: create a new session with the same context
+  /// messages up to this point. Returns the new session key.
+  Future<String> fork(String key) async {
+    final meta = _meta[key];
+    if (meta == null) throw StateError('Session $key not found');
+
+    final messages = List<LlmMessage>.from(_contextCache[key] ?? []);
+    final newKey = '${key}_fork_${DateTime.now().millisecondsSinceEpoch}';
+
+    final newMeta = SessionMeta(
+      key: newKey,
+      channelType: meta.channelType,
+      chatId: meta.chatId,
+      modelOverride: meta.modelOverride,
+      thinkingLevel: meta.thinkingLevel,
+    );
+    _meta[newKey] = newMeta;
+
+    final dir = await _getSessionsDir();
+    await Directory(dir).create(recursive: true);
+
+    // Write session header
+    final header = TranscriptEntry(
+      type: 'session',
+      id: newMeta.sessionId,
+      data: {
+        'channelType': meta.channelType,
+        'chatId': meta.chatId,
+        'sessionKey': newKey,
+        'forkedFrom': key,
+      },
+    );
+    await _appendToTranscript(dir, newMeta.sessionId, header);
+
+    // Write all messages from the source session
+    String? prevId = newMeta.sessionId;
+    for (final msg in messages) {
+      final entryId = _uuid.v4();
+      final entry = TranscriptEntry(
+        type: 'message',
+        id: entryId,
+        parentId: prevId,
+        data: {
+          'role': msg.role,
+          'content': msg.content,
+          if (msg.name != null) 'name': msg.name,
+          if (msg.toolCalls != null)
+            'toolCalls': msg.toolCalls!.map((e) => e.toJson()).toList(),
+          if (msg.toolCallId != null) 'toolCallId': msg.toolCallId,
+        },
+      );
+      await _appendToTranscript(dir, newMeta.sessionId, entry);
+      prevId = entryId;
+    }
+
+    _contextCache[newKey] = List.from(messages);
+    newMeta.messageCount = messages.length;
+
+    await _saveStore(dir);
+    _sessionsChangedController.add(null);
+    _log.info('Forked $key -> $newKey (${messages.length} messages)');
+    return newKey;
   }
 
   /// Load all session metadata from sessions.json.
@@ -709,14 +845,17 @@ class SessionManager {
     final messages = <LlmMessage>[];
     String? lastCompactionSummary;
     String? firstKeptEntryId;
+    int? rewindCutoff; // max number of messages to keep (from most recent rewind)
 
-    // Find the last compaction entry
+    // Scan backwards for the most recent compaction and rewind entries.
     for (final e in entries.reversed) {
-      if (e.type == 'compaction') {
+      if (e.type == 'compaction' && lastCompactionSummary == null) {
         lastCompactionSummary = e.data['summary'] as String?;
         firstKeptEntryId = e.data['firstKeptEntryId'] as String?;
-        break;
+      } else if (e.type == 'rewind' && rewindCutoff == null) {
+        rewindCutoff = e.data['cutoffMessageCount'] as int?;
       }
+      if (lastCompactionSummary != null && rewindCutoff != null) break;
     }
 
     bool afterCompaction = lastCompactionSummary == null;
@@ -759,6 +898,17 @@ class SessionManager {
         toolCalls: toolCalls,
         toolCallId: toolCallId,
       ));
+    }
+
+    // Apply rewind cutoff: keep only messages up to rewindCutoff count.
+    // The cutoff is relative to messages AFTER the compaction summary.
+    if (rewindCutoff != null) {
+      final summaryOffset = lastCompactionSummary != null ? 1 : 0;
+      final maxKeep = summaryOffset + rewindCutoff;
+      if (messages.length > maxKeep) {
+        _contextCache[key] = messages.sublist(0, maxKeep);
+        return;
+      }
     }
 
     _contextCache[key] = messages;
