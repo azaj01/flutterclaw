@@ -166,13 +166,15 @@ final sessionManagerProvider = Provider<SessionManager>((ref) {
 
 /// Estimated context usage for the active session as a value 0.0–1.0.
 ///
-/// Computes: estimated context tokens / model context window.
+/// Computes: (system_prompt_estimate + actual_context_messages) / context_window.
 /// Used by [ContextUsageBar] to show a progress indicator above the input.
 final contextUsageProvider = Provider<double>((ref) {
   final configManager = ref.watch(configManagerProvider);
   final sessionManager = ref.watch(sessionManagerProvider);
   final activeKey = ref.watch(activeSessionKeyProvider);
-  final chatMessages = ref.watch(chatProvider);
+  // Watch chatProvider only for reactivity — when a message is added the chat
+  // state changes, which invalidates this provider and triggers a recompute.
+  ref.watch(chatProvider);
 
   // Derive model name for this session
   final modelName = resolveSessionModelName(
@@ -186,15 +188,17 @@ final contextUsageProvider = Provider<double>((ref) {
   );
   if (contextWindow <= 0) return 0.0;
 
-  // Count tokens from rendered messages (conversation proxy).
-  final messageTokens = chatMessages.fold<int>(
-    0,
-    (sum, m) => sum + TokenBudgetManager.estimateTokens(m.text),
+  // Use the actual LLM context messages (from in-memory cache) rather than
+  // the rendered chat bubbles. This includes the full content of every message
+  // including tool results, which can be large and is what actually consumes
+  // the context window.
+  final contextMessages = sessionManager.getContextMessages(activeKey);
+  final messageTokens = TokenBudgetManager.estimateConversationTokens(
+    contextMessages.map((m) => {'content': m.content}).toList(),
   );
 
-  // Add a fixed estimate for the system prompt (workspace files + runtime
-  // context + device guidance). This is the dominant cost for Claude/Bedrock
-  // (~25K tokens) — without it the bar would stay near 0% for normal sessions.
+  // Fixed estimate for the system prompt (workspace files + runtime context
+  // + device guidance). Typical agent workspace = ~25K tokens.
   const kSystemPromptEstimate = 25000;
 
   final totalEstimate = kSystemPromptEstimate + messageTokens;
