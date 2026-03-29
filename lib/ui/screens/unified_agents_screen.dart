@@ -1101,6 +1101,9 @@ class _UnifiedAgentsScreenState extends ConsumerState<UnifiedAgentsScreen> {
     configManager.update(config.copyWith(agentProfiles: updatedProfiles));
     await configManager.save();
     ref.invalidate(agentProfilesProvider);
+    ref.invalidate(activeAgentProvider);
+    ref.invalidate(activeWorkspacePathProvider);
+    ref.invalidate(activeModelSupportsVisionProvider);
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(

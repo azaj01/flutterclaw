@@ -168,6 +168,9 @@ class AgentsListScreen extends ConsumerWidget {
     configManager.update(config.copyWith(agentProfiles: updatedProfiles));
     await configManager.save();
     ref.invalidate(agentProfilesProvider);
+    ref.invalidate(activeAgentProvider);
+    ref.invalidate(activeWorkspacePathProvider);
+    ref.invalidate(activeModelSupportsVisionProvider);
   }
 
   Future<void> _confirmDelete(
