@@ -815,41 +815,58 @@ final channelRouterProvider = Provider<ChannelRouter>((ref) {
   router = ChannelRouter(
     transcriptionServiceFactory: () => _buildTranscriptionService(configManager),
     agentHandler: (IncomingMessage msg) async {
-      final response = await agentLoop.processMessage(
-        msg.sessionKey,
-        msg.text,
-        channelType: msg.channelType,
-        chatId: msg.chatId,
-        contentBlocks: msg.contentBlocks,
-        channelContext: msg.channelContext,
-      );
-
-      // If the user sent a voice message, reply with audio (voice-to-voice).
-      final wasVoice = msg.channelContext?['isVoiceMessage'] == true;
-      List<int>? voiceBytes;
-      if (wasVoice && msg.channelType != 'webchat') {
-        final audioPath = await tts.synthesizeToFile(response.content);
-        if (audioPath != null) {
-          try {
-            voiceBytes = await File(audioPath).readAsBytes();
-          } finally {
-            await File(audioPath).delete().catchError((_) => File(audioPath));
-          }
-        }
-      }
-
-      await router.sendMessage(
-        OutgoingMessage(
+      try {
+        final response = await agentLoop.processMessage(
+          msg.sessionKey,
+          msg.text,
           channelType: msg.channelType,
           chatId: msg.chatId,
-          text: response.content,
-          audioBytes: voiceBytes != null
-              ? Uint8List.fromList(voiceBytes)
-              : null,
-          audioMimeType: 'audio/wav',
-          isVoiceNote: true,
-        ),
-      );
+          contentBlocks: msg.contentBlocks,
+          channelContext: msg.channelContext,
+        );
+
+        // If the user sent a voice message, reply with audio (voice-to-voice).
+        final wasVoice = msg.channelContext?['isVoiceMessage'] == true;
+        List<int>? voiceBytes;
+        if (wasVoice && msg.channelType != 'webchat') {
+          final audioPath = await tts.synthesizeToFile(response.content);
+          if (audioPath != null) {
+            try {
+              voiceBytes = await File(audioPath).readAsBytes();
+            } finally {
+              await File(audioPath).delete().catchError((_) => File(audioPath));
+            }
+          }
+        }
+
+        await router.sendMessage(
+          OutgoingMessage(
+            channelType: msg.channelType,
+            chatId: msg.chatId,
+            text: response.content,
+            audioBytes: voiceBytes != null
+                ? Uint8List.fromList(voiceBytes)
+                : null,
+            audioMimeType: 'audio/wav',
+            isVoiceNote: true,
+          ),
+        );
+      } catch (e, st) {
+        Logger('agentHandler').severe(
+            'Failed processing ${msg.channelType} message', e, st);
+        try {
+          await router.sendMessage(
+            OutgoingMessage(
+              channelType: msg.channelType,
+              chatId: msg.chatId,
+              text: 'Sorry, something went wrong processing your message. '
+                  'Please try again.',
+            ),
+          );
+        } catch (_) {
+          // Best-effort — if sending the error also fails, already logged above.
+        }
+      }
     },
   );
 

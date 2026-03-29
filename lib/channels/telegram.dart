@@ -444,21 +444,29 @@ class TelegramChannelAdapter implements ChannelAdapter {
     if (message.text.isNotEmpty) {
       final chunks = _splitMessage(message.text, 4000);
       for (final chunk in chunks) {
+        final params = <String, dynamic>{
+          'chat_id': message.chatId,
+          'text': chunk,
+          'parse_mode': 'Markdown',
+        };
+        if (message.replyToMessageId != null) {
+          params['reply_to_message_id'] =
+              int.tryParse(message.replyToMessageId!) ??
+                  message.replyToMessageId;
+        }
         try {
-          final params = <String, dynamic>{
-            'chat_id': message.chatId,
-            'text': chunk,
-            'parse_mode': 'Markdown',
-          };
-          if (message.replyToMessageId != null) {
-            params['reply_to_message_id'] =
-                int.tryParse(message.replyToMessageId!) ??
-                    message.replyToMessageId;
-          }
           await _dio.post('/sendMessage', data: params);
-        } catch (e, st) {
-          _log.severe('Failed to send Telegram message', e, st);
-          rethrow;
+        } catch (e, _) {
+          // Markdown rejected — retry as plain text.
+          _log.warning('Telegram Markdown send failed, retrying as plain text',
+              e);
+          try {
+            params.remove('parse_mode');
+            await _dio.post('/sendMessage', data: params);
+          } catch (e2, st2) {
+            _log.severe('Telegram plain text send also failed', e2, st2);
+            rethrow;
+          }
         }
       }
     }
