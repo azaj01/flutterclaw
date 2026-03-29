@@ -255,6 +255,9 @@ class HeadlessBrowserTool extends Tool {
   // --- Config & callbacks ---
   final BrowserConfig _config;
   final Future<void> Function(String url, String message)? _onRequestUserAction;
+  /// Optional callback to describe a screenshot via a parallel vision LLM call.
+  /// Receives the raw JPEG bytes; returns a text description or null on failure.
+  final Future<String?> Function(Uint8List bytes, String mimeType)? _onDescribeImage;
 
   // --- Tab state ---
   final Map<String, _BrowserTab> _tabs = {};
@@ -280,8 +283,10 @@ class HeadlessBrowserTool extends Tool {
   HeadlessBrowserTool({
     BrowserConfig config = const BrowserConfig(),
     Future<void> Function(String url, String message)? onRequestUserAction,
+    Future<String?> Function(Uint8List bytes, String mimeType)? onDescribeImage,
   })  : _config = config,
-        _onRequestUserAction = onRequestUserAction;
+        _onRequestUserAction = onRequestUserAction,
+        _onDescribeImage = onDescribeImage;
 
   // --- Convenience getters for active tab ---
   _BrowserTab? get _activeTab => _tabs[_activeTabId];
@@ -310,7 +315,14 @@ class HeadlessBrowserTool extends Tool {
       '(3) After the user taps Done, navigate back to the original URL to continue the task. '
       '(4) Use save_profile to persist the session for future use.'
       '\n\nCAPTCHA HANDLING: When "⚠️ CAPTCHA DETECTED" appears, call request_user_action '
-      'immediately so the user can solve it in the app.';
+      'immediately so the user can solve it in the app.'
+      '\n\nrequest_user_action PROTOCOL (CRITICAL): ALWAYS send a message to the user on their '
+      'current channel (Telegram, Discord, chat, etc.) BEFORE calling request_user_action. '
+      'Tell them explicitly: what you need them to do, and that they must open the FlutterClaw app. '
+      'Example: "I need you to log in to LinkedIn. Please open the FlutterClaw app — I\'ve opened '
+      'a browser there for you. Complete the login and tap Done to continue." '
+      'Only after sending that message should you call request_user_action. '
+      'A push notification will also fire, but the channel message is the primary alert.';
 
   @override
   Map<String, dynamic> get parameters => {
@@ -359,6 +371,7 @@ class HeadlessBrowserTool extends Tool {
           // Screenshot
           'full_page': {'type': 'boolean', 'description': 'Capture full page height (default: false).'},
           'quality': {'type': 'integer', 'description': 'JPEG quality 1-100 (default: 80).'},
+          'describe': {'type': 'boolean', 'description': 'If true, run a parallel vision LLM call to describe the screenshot and include the description in the result (default: false). Use this when you need to understand the page visually without adding the image to context.'},
           // wait_for
           'timeout_ms': {'type': 'integer', 'description': 'Wait timeout ms (default: 10000).'},
           'visible': {'type': 'boolean', 'description': 'Wait for element to be visible (default: false).'},
@@ -987,9 +1000,9 @@ class HeadlessBrowserTool extends Tool {
     if (_controller == null) return ToolResult.error('No browser session. Use navigate first.');
     final quality = (args['quality'] as int? ?? 80).clamp(1, 100);
     final fullPage = args['full_page'] as bool? ?? false;
+    final describe = args['describe'] as bool? ?? false;
 
     if (fullPage) {
-      // Expand viewport temporarily to full page height
       await _controller!.evaluateJavascript(
         source: 'document.body.style.overflow = "visible";',
       );
@@ -1008,10 +1021,29 @@ class HeadlessBrowserTool extends Tool {
     final url = (await _controller!.getUrl())?.toString() ?? '';
     final title = await _controller!.getTitle() ?? '';
 
+    // Optionally describe the image via a parallel vision LLM call.
+    // The description goes into content (visible to the LLM) while the raw
+    // image bytes stay in details (UI only) — so the context window is never
+    // flooded with base64 data.
+    String? description;
+    if (describe) {
+      final describeCallback = _onDescribeImage;
+      if (describeCallback != null) {
+        try {
+          description = await describeCallback(screenshot, 'image/jpeg');
+        } catch (_) {
+          description = null;
+        }
+      }
+    }
+
+    final contentText = description != null
+        ? 'Screenshot — URL: $url | Title: $title\n\nVisual description: $description'
+        : 'Screenshot captured: ${screenshot.length} bytes, JPEG q$quality. URL: $url. Title: $title.'
+          '${describe ? ' (vision not available — model may not support images)' : ''}';
+
     return ToolResult(
-      // Keep base64 out of content — it goes to the LLM and would fill the context window.
-      // The image is available in details for the UI layer only.
-      content: 'Screenshot captured: ${screenshot.length} bytes, JPEG q$quality. URL: $url. Title: $title.',
+      content: contentText,
       details: {
         'screenshot': {
           'mimeType': 'image/jpeg',

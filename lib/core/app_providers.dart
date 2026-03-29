@@ -282,17 +282,19 @@ final toolRegistryProvider = Provider<ToolRegistry>((ref) {
   final headlessBrowser = HeadlessBrowserTool(
     config: configManager.config.tools.browser,
     onRequestUserAction: (url, message) async {
-      final notifService = ref.read(notificationServiceProvider);
-      final agentName = configManager.config.activeAgent?.name ?? 'Agent';
-
-      // Notify the user — critical when they're on a remote channel (Telegram, etc.)
-      // and wouldn't otherwise know the app is waiting for their input.
-      await notifService.showMessageNotification(
-        'browser',
-        '🌐 $agentName — Action Required',
-        message,
-        payload: 'browser_overlay',
-      );
+      // Fire push notification — this is the primary signal to the user when
+      // they're on Telegram / Discord / any remote channel. Wrapped in try-catch
+      // so a notification failure never prevents the overlay from appearing.
+      try {
+        final notifService = ref.read(notificationServiceProvider);
+        final agentName = configManager.config.activeAgent?.name ?? 'Agent';
+        await notifService.showMessageNotification(
+          'browser',
+          '🌐 $agentName — Action Required in App',
+          message,
+          payload: 'browser_overlay',
+        );
+      } catch (_) {}
 
       final nav = FlutterClawApp.navigatorKey.currentState;
       if (nav == null) return;
@@ -302,9 +304,45 @@ final toolRegistryProvider = Provider<ToolRegistry>((ref) {
           builder: (_) => BrowserOverlay(url: url, message: message),
         ),
       );
+    },
+    onDescribeImage: (bytes, mimeType) async {
+      // Parallel vision call to describe the screenshot without polluting
+      // the main conversation context with base64 data.
+      try {
+        final router = ref.read(providerRouterProvider);
+        final config = configManager.config;
+        final modelName = config.agents.defaults.modelName;
+        final modelEntry = config.getModel(modelName);
+        if (modelEntry == null || !modelEntry.supportsVision) return null;
 
-      // Dismiss the notification after the user completes the action
-      await notifService.cancelNotification(NotificationIds.toolStatus);
+        final base64Data = base64.encode(bytes);
+        final request = LlmRequest(
+          model: modelEntry.model,
+          apiKey: config.resolveApiKey(modelEntry),
+          apiBase: config.resolveApiBase(modelEntry),
+          messages: [
+            LlmMessage(
+              role: 'user',
+              content: [
+                {'type': 'image', 'data': base64Data, 'mimeType': mimeType},
+                {
+                  'type': 'text',
+                  'text': 'Describe this screenshot concisely (2-4 sentences). '
+                      'Include: page type, main visible content, key UI elements, '
+                      'any text/buttons, and overall state (login form, feed, error, etc.).',
+                },
+              ],
+            ),
+          ],
+          maxTokens: 512,
+          temperature: 0.1,
+          supportsVision: true,
+        );
+        final response = await router.chatCompletion(request);
+        return response.content;
+      } catch (_) {
+        return null;
+      }
     },
   );
   registry.register(WebFetchTool(headlessBrowser: headlessBrowser));
