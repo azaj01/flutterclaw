@@ -589,6 +589,9 @@ class _CreateAgentScreenState extends ConsumerState<CreateAgentScreen> {
         configManager.update(config.copyWith(agentProfiles: updatedProfiles));
         await configManager.save();
         ref.invalidate(agentProfilesProvider);
+        ref.invalidate(activeAgentProvider);
+        ref.invalidate(activeWorkspacePathProvider);
+        ref.invalidate(activeModelSupportsVisionProvider);
 
         // Sync Live Activity if this is the active agent and gateway is running
         final activeAgent = ref.read(activeAgentProvider);

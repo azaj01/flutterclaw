@@ -119,7 +119,8 @@ class IosGatewayService {
       // Start Live Activity
       final host = configManager.config.gateway.host;
       final port = configManager.config.gateway.port;
-      final model = configManager.config.agents.defaults.modelName;
+      final model = configManager.config.activeAgent?.modelName ??
+          configManager.config.agents.defaults.modelName;
 
       await LiveActivityService.startActivity(
         host: host,
@@ -136,7 +137,8 @@ class IosGatewayService {
       // Show error in Live Activity
       final host = _configManager?.config.gateway.host ?? '127.0.0.1';
       final port = _configManager?.config.gateway.port ?? 18789;
-      final model = _configManager?.config.agents.defaults.modelName ?? '';
+      final model = _configManager?.config.activeAgent?.modelName ??
+          _configManager?.config.agents.defaults.modelName ?? '';
 
       await LiveActivityService.startActivityWithError(
         host: host,

@@ -6,6 +6,7 @@
 /// Auto-restarts on boot when configured.
 library;
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -102,9 +103,11 @@ class FlutterClawTaskHandler extends TaskHandler {
     _configManager = ConfigManager();
     await _configManager!.ensureDirectories();
     await _configManager!.load();
-    _model = _configManager!.config.agents.defaults.modelName;
+    _model = _configManager!.config.activeAgent?.modelName ??
+        _configManager!.config.agents.defaults.modelName;
     _host = _configManager!.config.gateway.host;
     _port = _configManager!.config.gateway.port;
+    _cachedWorkspacePath = await _configManager!.workspacePath;
 
     _gatewayState = 'starting';
     _sendNotificationToMain('FlutterClaw', 'Starting... $_host:$_port');
@@ -286,6 +289,10 @@ class FlutterClawTaskHandler extends TaskHandler {
 
   /// Builds notification text with status, model, address, uptime; optionally
   /// sessions and tokens (like Live Activity on iOS).
+  ///
+  /// On Android, BigTextStyle expands multi-line text. When running, includes
+  /// active channels, automation rules, and action center unread counts
+  /// read directly from workspace JSON files.
   String _buildNotificationText({
     int? sessionCount,
     int? tokensProcessed,
@@ -299,12 +306,21 @@ class FlutterClawTaskHandler extends TaskHandler {
     switch (_gatewayState) {
       case 'running':
         final line1 = '\u25CF $modelLabel  \u00B7  $addr  \u00B7  ${_formatUptime(uptime)}';
+        final lines = <String>[line1];
+
         if (sessionCount != null && tokensProcessed != null) {
           final sessionsStr = sessionCount == 1 ? '1 chat' : '$sessionCount chats';
           final tokensStr = _formatTokens(tokensProcessed);
-          return '$line1\n$sessionsStr  \u00B7  $tokensStr tokens';
+          lines.add('$sessionsStr  \u00B7  $tokensStr tokens');
         }
-        return line1;
+
+        // Rich status lines from workspace state (best-effort, non-blocking)
+        final statusLine = _buildRichStatusLine();
+        if (statusLine.isNotEmpty) {
+          lines.add(statusLine);
+        }
+
+        return lines.join('\n');
       case 'starting':
         return '\u25CB Starting...  \u00B7  $addr';
       case 'retrying':
@@ -319,6 +335,73 @@ class FlutterClawTaskHandler extends TaskHandler {
         return '\u25A1 Stopped';
       default:
         return _gatewayState;
+    }
+  }
+
+  /// Cached workspace path for notification status reads.
+  String? _cachedWorkspacePath;
+
+  /// Reads workspace JSON files to build a rich status line for the notification.
+  /// Returns empty string if no interesting state exists.
+  String _buildRichStatusLine() {
+    try {
+      final ws = _cachedWorkspacePath;
+      if (ws == null) return '';
+
+      final parts = <String>[];
+
+      // Count automation rules
+      final rulesFile = File('$ws/automation/rules.json');
+      if (rulesFile.existsSync()) {
+        try {
+          final list = jsonDecode(rulesFile.readAsStringSync()) as List;
+          final enabled = list.where((r) => r['enabled'] == true).length;
+          if (enabled > 0) {
+            parts.add('$enabled rule${enabled == 1 ? '' : 's'}');
+          }
+        } catch (_) {}
+      }
+
+      // Count active cron jobs
+      final cronFile = File('$ws/cron/jobs.json');
+      if (cronFile.existsSync()) {
+        try {
+          final list = jsonDecode(cronFile.readAsStringSync()) as List;
+          final enabled = list.where((j) => j['enabled'] == true).length;
+          if (enabled > 0) {
+            parts.add('$enabled cron');
+          }
+        } catch (_) {}
+      }
+
+      // Count active watchers
+      final watcherFile = File('$ws/watcher/watchers.json');
+      if (watcherFile.existsSync()) {
+        try {
+          final list = jsonDecode(watcherFile.readAsStringSync()) as List;
+          final enabled = list.where((w) => w['enabled'] == true).length;
+          if (enabled > 0) {
+            parts.add('$enabled watcher${enabled == 1 ? '' : 's'}');
+          }
+        } catch (_) {}
+      }
+
+      // Count action center unread items
+      final acFile = File('$ws/action_center/items.json');
+      if (acFile.existsSync()) {
+        try {
+          final list = jsonDecode(acFile.readAsStringSync()) as List;
+          final unread = list.where((i) => i['status'] == 'unread').length;
+          if (unread > 0) {
+            parts.add('$unread unread');
+          }
+        } catch (_) {}
+      }
+
+      if (parts.isEmpty) return '';
+      return parts.join('  \u00B7  ');
+    } catch (_) {
+      return '';
     }
   }
 
