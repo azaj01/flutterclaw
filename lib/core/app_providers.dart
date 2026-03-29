@@ -282,7 +282,10 @@ final toolRegistryProvider = Provider<ToolRegistry>((ref) {
   registry.register(ListDirTool(wsPath));
   registry.register(AppendFileTool(wsPath));
   registry.register(WebSearchTool(config: configManager.config));
-  final headlessBrowser = HeadlessBrowserTool(
+  // Late reference so the callback can access the browser's current user agent
+  // (the closure is defined inside the constructor, before the variable is assigned).
+  late final HeadlessBrowserTool headlessBrowser;
+  headlessBrowser = HeadlessBrowserTool(
     config: configManager.config.tools.browser,
     onRequestUserAction: (url, message, sessionKey) async {
       final agentName = configManager.config.activeAgent?.name ?? 'Agent';
@@ -327,7 +330,11 @@ final toolRegistryProvider = Provider<ToolRegistry>((ref) {
       await nav.push<void>(
         MaterialPageRoute<void>(
           fullscreenDialog: true,
-          builder: (_) => BrowserOverlay(url: url, message: message),
+          builder: (_) => BrowserOverlay(
+            url: url,
+            message: message,
+            userAgent: headlessBrowser.currentUserAgent,
+          ),
         ),
       );
     },
@@ -1340,6 +1347,7 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
   bool _processing = false;
   bool get isProcessing => _processing;
   bool _cancelled = false;
+  StreamSubscription<AgentStreamEvent>? _activeSubscription;
   bool _hatchTriggered = false;
   String? _historyLoadedForAgent; // agentId whose history is currently loaded
   bool _isAppInBackground = false;
@@ -1349,12 +1357,20 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
   void cancelProcessing() {
     if (!_processing) return;
     _cancelled = true;
+    _activeSubscription?.cancel();
+    _activeSubscription = null;
     // Immediately mark the last assistant bubble as done so the UI updates.
     final updated = List<ChatMessage>.from(state);
     if (updated.isNotEmpty && !updated.last.isUser) {
       updated[updated.length - 1] = updated.last.copyWith(isStreaming: false);
-      state = updated;
     }
+    // Also close any open tool pills left in streaming state.
+    for (var i = updated.length - 1; i >= 0; i--) {
+      if (updated[i].isToolStatus && updated[i].isStreaming == true) {
+        updated[i] = updated[i].copyWith(isStreaming: false);
+      }
+    }
+    state = updated;
   }
 
   /// Kill the currently running sandbox process and mark the tool pill as done.
@@ -1373,6 +1389,35 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
       }
     }
     state = updated;
+  }
+
+  /// Consume [stream] through a [StreamSubscription] stored in
+  /// [_activeSubscription] so that [cancelProcessing] can cancel it
+  /// immediately — even when the stream is idle between events.
+  Future<void> _forEachCancellable(
+    Stream<AgentStreamEvent> stream,
+    void Function(AgentStreamEvent event) onData,
+  ) async {
+    final completer = Completer<void>();
+    final sub = stream.listen(
+      (event) {
+        if (_cancelled) return;
+        onData(event);
+      },
+      onDone: () {
+        if (!completer.isCompleted) completer.complete();
+      },
+      onError: (Object e, StackTrace st) {
+        if (!completer.isCompleted) completer.completeError(e, st);
+      },
+      cancelOnError: true,
+    );
+    _activeSubscription = sub;
+    try {
+      await completer.future;
+    } finally {
+      _activeSubscription = null;
+    }
   }
 
   /// Returns the session key currently being viewed in the chat screen.
@@ -1619,87 +1664,88 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
 
     try {
       final buffer = StringBuffer();
-      await for (final event in agentLoop.processMessageStream(
-        _getSessionKey(),
-        '', // empty user message — the system prompt drives the hatch
-        channelType: 'webchat',
-        chatId: 'default',
-        userLanguage: userLanguage,
-      )) {
-        if (_cancelled) break;
-
-        if (event.toolName != null) {
-          final updated = List<ChatMessage>.from(state);
-          updated.insert(
-            updated.length - 1,
-            ChatMessage(
-              text: _formatToolStatus(event.toolName!, event.toolArgs),
-              isUser: false,
-              timestamp: DateTime.now(),
-              isToolStatus: true,
-              isStreaming: true,
-            ),
-          );
-          state = updated;
-        }
-
-        // If a tool returned an interactive payload, inject an interactive
-        // message into the chat so the user can tap buttons/selects.
-        if (event.toolDetails != null) {
-          final interactive = parseInteractiveReply(event.toolDetails!['interactive']);
-          if (interactive != null) {
+      await _forEachCancellable(
+        agentLoop.processMessageStream(
+          _getSessionKey(),
+          '', // empty user message — the system prompt drives the hatch
+          channelType: 'webchat',
+          chatId: 'default',
+          userLanguage: userLanguage,
+        ),
+        (event) {
+          if (event.toolName != null) {
             final updated = List<ChatMessage>.from(state);
             updated.insert(
               updated.length - 1,
               ChatMessage(
-                text: '',
+                text: _formatToolStatus(event.toolName!, event.toolArgs),
                 isUser: false,
                 timestamp: DateTime.now(),
-                interactiveReply: interactive,
+                isToolStatus: true,
+                isStreaming: true,
               ),
             );
             state = updated;
           }
-        }
 
-        if (event.textDelta != null) {
-          buffer.write(event.textDelta);
-          final updated = List<ChatMessage>.from(state);
-          updated[updated.length - 1] = updated.last.copyWith(
-            text: buffer.toString(),
-          );
-          state = updated;
-        }
-
-        if (event.isDone) {
-          final resp = event.finalResponse;
-          final finalText = resp?.content ?? buffer.toString();
-          final updated = List<ChatMessage>.from(state);
-          updated[updated.length - 1] = updated.last.copyWith(
-            text: finalText,
-            isStreaming: false,
-            isError: resp?.isError ?? false,
-            errorStatusCode: resp?.errorStatusCode,
-            errorTitle: resp?.errorTitle,
-            errorCtaUrl: resp?.errorCtaUrl,
-            errorCtaLabel: resp?.errorCtaLabel,
-          );
-          state = updated;
-
-          // If battery-aware or offline switching changed the model, sync
-          // the actual model used to the Live Activity so it shows correctly.
-          if (resp?.modelUsed != null) {
-            final gwNotifier = ref.read(gatewayStateProvider.notifier);
-            if (resp!.modelUsed != ref.read(gatewayStateProvider).currentModel) {
-              gwNotifier.setModel(resp.modelUsed!);
+          // If a tool returned an interactive payload, inject an interactive
+          // message into the chat so the user can tap buttons/selects.
+          if (event.toolDetails != null) {
+            final interactive = parseInteractiveReply(event.toolDetails!['interactive']);
+            if (interactive != null) {
+              final updated = List<ChatMessage>.from(state);
+              updated.insert(
+                updated.length - 1,
+                ChatMessage(
+                  text: '',
+                  isUser: false,
+                  timestamp: DateTime.now(),
+                  interactiveReply: interactive,
+                ),
+              );
+              state = updated;
             }
           }
 
-          if (_isAppInBackground && finalText.trim().isNotEmpty) {
-            _sendBackgroundNotification(finalText);
+          if (event.textDelta != null) {
+            buffer.write(event.textDelta);
+            final updated = List<ChatMessage>.from(state);
+            updated[updated.length - 1] = updated.last.copyWith(
+              text: buffer.toString(),
+            );
+            state = updated;
           }
-        }
-      }
+
+          if (event.isDone) {
+            final resp = event.finalResponse;
+            final finalText = resp?.content ?? buffer.toString();
+            final updated = List<ChatMessage>.from(state);
+            updated[updated.length - 1] = updated.last.copyWith(
+              text: finalText,
+              isStreaming: false,
+              isError: resp?.isError ?? false,
+              errorStatusCode: resp?.errorStatusCode,
+              errorTitle: resp?.errorTitle,
+              errorCtaUrl: resp?.errorCtaUrl,
+              errorCtaLabel: resp?.errorCtaLabel,
+            );
+            state = updated;
+
+            // If battery-aware or offline switching changed the model, sync
+            // the actual model used to the Live Activity so it shows correctly.
+            if (resp?.modelUsed != null) {
+              final gwNotifier = ref.read(gatewayStateProvider.notifier);
+              if (resp!.modelUsed != ref.read(gatewayStateProvider).currentModel) {
+                gwNotifier.setModel(resp.modelUsed!);
+              }
+            }
+
+            if (_isAppInBackground && finalText.trim().isNotEmpty) {
+              _sendBackgroundNotification(finalText);
+            }
+          }
+        },
+      );
     } catch (e) {
       final updated = List<ChatMessage>.from(state);
       if (updated.isNotEmpty) {
@@ -1785,42 +1831,44 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
       ];
 
       final buffer = StringBuffer();
-      await for (final event in agentLoop.processMessageStream(
-        _getSessionKey(),
-        caption,
-        channelType: 'webchat',
-        chatId: 'default',
-        contentBlocks: contentBlocks,
-      )) {
-        if (_cancelled) break;
-        if (event.textDelta != null) {
-          buffer.write(event.textDelta);
-          final updated = List<ChatMessage>.from(state);
-          updated[updated.length - 1] = updated.last.copyWith(
-            text: buffer.toString(),
-          );
-          state = updated;
-        }
-        if (event.isDone) {
-          final resp = event.finalResponse;
-          final finalText = resp?.content ?? buffer.toString();
-          final updated = List<ChatMessage>.from(state);
-          updated[updated.length - 1] = updated.last.copyWith(
-            text: finalText,
-            isStreaming: false,
-            isError: resp?.isError ?? false,
-            errorStatusCode: resp?.errorStatusCode,
-            errorTitle: resp?.errorTitle,
-            errorCtaUrl: resp?.errorCtaUrl,
-            errorCtaLabel: resp?.errorCtaLabel,
-          );
-          state = updated;
-
-          if (_isAppInBackground && finalText.trim().isNotEmpty) {
-            _sendBackgroundNotification(finalText);
+      await _forEachCancellable(
+        agentLoop.processMessageStream(
+          _getSessionKey(),
+          caption,
+          channelType: 'webchat',
+          chatId: 'default',
+          contentBlocks: contentBlocks,
+        ),
+        (event) {
+          if (event.textDelta != null) {
+            buffer.write(event.textDelta);
+            final updated = List<ChatMessage>.from(state);
+            updated[updated.length - 1] = updated.last.copyWith(
+              text: buffer.toString(),
+            );
+            state = updated;
           }
-        }
-      }
+          if (event.isDone) {
+            final resp = event.finalResponse;
+            final finalText = resp?.content ?? buffer.toString();
+            final updated = List<ChatMessage>.from(state);
+            updated[updated.length - 1] = updated.last.copyWith(
+              text: finalText,
+              isStreaming: false,
+              isError: resp?.isError ?? false,
+              errorStatusCode: resp?.errorStatusCode,
+              errorTitle: resp?.errorTitle,
+              errorCtaUrl: resp?.errorCtaUrl,
+              errorCtaLabel: resp?.errorCtaLabel,
+            );
+            state = updated;
+
+            if (_isAppInBackground && finalText.trim().isNotEmpty) {
+              _sendBackgroundNotification(finalText);
+            }
+          }
+        },
+      );
     } catch (e) {
       final errorMsg = _buildErrorMessage(e);
       final updated = List<ChatMessage>.from(state);
@@ -1910,42 +1958,44 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
       ];
 
       final buffer = StringBuffer();
-      await for (final event in agentLoop.processMessageStream(
-        _getSessionKey(),
-        caption.isNotEmpty ? caption : fileName,
-        channelType: 'webchat',
-        chatId: 'default',
-        contentBlocks: contentBlocks,
-      )) {
-        if (_cancelled) break;
-        if (event.textDelta != null) {
-          buffer.write(event.textDelta);
-          final updated = List<ChatMessage>.from(state);
-          updated[updated.length - 1] = updated.last.copyWith(
-            text: buffer.toString(),
-          );
-          state = updated;
-        }
-        if (event.isDone) {
-          final resp = event.finalResponse;
-          final finalText = resp?.content ?? buffer.toString();
-          final updated = List<ChatMessage>.from(state);
-          updated[updated.length - 1] = updated.last.copyWith(
-            text: finalText,
-            isStreaming: false,
-            isError: resp?.isError ?? false,
-            errorStatusCode: resp?.errorStatusCode,
-            errorTitle: resp?.errorTitle,
-            errorCtaUrl: resp?.errorCtaUrl,
-            errorCtaLabel: resp?.errorCtaLabel,
-          );
-          state = updated;
-
-          if (_isAppInBackground && finalText.trim().isNotEmpty) {
-            _sendBackgroundNotification(finalText);
+      await _forEachCancellable(
+        agentLoop.processMessageStream(
+          _getSessionKey(),
+          caption.isNotEmpty ? caption : fileName,
+          channelType: 'webchat',
+          chatId: 'default',
+          contentBlocks: contentBlocks,
+        ),
+        (event) {
+          if (event.textDelta != null) {
+            buffer.write(event.textDelta);
+            final updated = List<ChatMessage>.from(state);
+            updated[updated.length - 1] = updated.last.copyWith(
+              text: buffer.toString(),
+            );
+            state = updated;
           }
-        }
-      }
+          if (event.isDone) {
+            final resp = event.finalResponse;
+            final finalText = resp?.content ?? buffer.toString();
+            final updated = List<ChatMessage>.from(state);
+            updated[updated.length - 1] = updated.last.copyWith(
+              text: finalText,
+              isStreaming: false,
+              isError: resp?.isError ?? false,
+              errorStatusCode: resp?.errorStatusCode,
+              errorTitle: resp?.errorTitle,
+              errorCtaUrl: resp?.errorCtaUrl,
+              errorCtaLabel: resp?.errorCtaLabel,
+            );
+            state = updated;
+
+            if (_isAppInBackground && finalText.trim().isNotEmpty) {
+              _sendBackgroundNotification(finalText);
+            }
+          }
+        },
+      );
     } catch (e) {
       final errorMsg = _buildErrorMessage(e);
       final updated = List<ChatMessage>.from(state);
@@ -2068,122 +2118,124 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
       final sessionKey = _getSessionKey();
       final (channelType, chatId) = _parseSessionKey(sessionKey);
 
-      await for (final event in agentLoop.processMessageStream(
-        sessionKey,
-        text,
-        channelType: channelType,
-        chatId: chatId,
-      )) {
-        if (_cancelled) break;
+      await _forEachCancellable(
+        agentLoop.processMessageStream(
+          sessionKey,
+          text,
+          channelType: channelType,
+          chatId: chatId,
+        ),
+        (event) {
+          if (event.toolName != null) {
+            flushBuffer(); // flush pending text before inserting tool pill
+            final updated = List<ChatMessage>.from(state);
+            updated.insert(
+              updated.length - 1,
+              ChatMessage(
+                text: _formatToolStatus(event.toolName!, event.toolArgs),
+                isUser: false,
+                timestamp: DateTime.now(),
+                isToolStatus: true,
+                isStreaming: true,
+              ),
+            );
+            state = updated;
+          }
 
-        if (event.toolName != null) {
-          flushBuffer(); // flush pending text before inserting tool pill
-          final updated = List<ChatMessage>.from(state);
-          updated.insert(
-            updated.length - 1,
-            ChatMessage(
-              text: _formatToolStatus(event.toolName!, event.toolArgs),
-              isUser: false,
-              timestamp: DateTime.now(),
-              isToolStatus: true,
-              isStreaming: true,
-            ),
-          );
-          state = updated;
-        }
-
-        // Streaming tool output chunk — update the live result text on the pill.
-        if (event.toolResultChunk != null) {
-          final chunk = event.toolResultChunk!;
-          final isClear = chunk.startsWith('\x00CLEAR\x00');
-          print('[ChatNotifier] toolResultChunk len=${chunk.length} isClear=$isClear');
-          final updated = List<ChatMessage>.from(state);
-          bool found = false;
-          for (var i = updated.length - 1; i >= 0; i--) {
-            if (updated[i].isToolStatus && updated[i].isStreaming == true) {
-              found = true;
-              final String newText;
-              if (isClear) {
-                // Replace accumulated text with the final authoritative output.
-                newText = chunk.substring(7); // \x00CLEAR\x00 is 7 chars
-              } else {
-                newText = (updated[i].toolResultText ?? '') + chunk;
+          // Streaming tool output chunk — update the live result text on the pill.
+          if (event.toolResultChunk != null) {
+            final chunk = event.toolResultChunk!;
+            final isClear = chunk.startsWith('\x00CLEAR\x00');
+            print('[ChatNotifier] toolResultChunk len=${chunk.length} isClear=$isClear');
+            final updated = List<ChatMessage>.from(state);
+            bool found = false;
+            for (var i = updated.length - 1; i >= 0; i--) {
+              if (updated[i].isToolStatus && updated[i].isStreaming == true) {
+                found = true;
+                final String newText;
+                if (isClear) {
+                  // Replace accumulated text with the final authoritative output.
+                  newText = chunk.substring(7); // \x00CLEAR\x00 is 7 chars
+                } else {
+                  newText = (updated[i].toolResultText ?? '') + chunk;
+                }
+                print('[ChatNotifier] → updating pill at i=$i, newText len=${newText.length}');
+                updated[i] = updated[i].copyWith(toolResultText: newText);
+                break;
               }
-              print('[ChatNotifier] → updating pill at i=$i, newText len=${newText.length}');
-              updated[i] = updated[i].copyWith(toolResultText: newText);
-              break;
             }
+            if (!found) print('[ChatNotifier] ⚠ no streaming pill found for chunk!');
+            state = updated;
           }
-          if (!found) print('[ChatNotifier] ⚠ no streaming pill found for chunk!');
-          state = updated;
-        }
 
-        if (event.toolResult != null) {
-          print('[ChatNotifier] toolResult len=${event.toolResult!.length}');
-          final updated = List<ChatMessage>.from(state);
-          bool found = false;
-          for (var i = updated.length - 1; i >= 0; i--) {
-            if (updated[i].isToolStatus && updated[i].isStreaming == true) {
-              found = true;
-              print('[ChatNotifier] → marking pill at i=$i as done');
-              updated[i] = updated[i].copyWith(
-                isStreaming: false,
-                toolResultText: event.toolResult,
-              );
-              break;
+          if (event.toolResult != null) {
+            print('[ChatNotifier] toolResult len=${event.toolResult!.length}');
+            final updated = List<ChatMessage>.from(state);
+            bool found = false;
+            for (var i = updated.length - 1; i >= 0; i--) {
+              if (updated[i].isToolStatus && updated[i].isStreaming == true) {
+                found = true;
+                print('[ChatNotifier] → marking pill at i=$i as done');
+                updated[i] = updated[i].copyWith(
+                  isStreaming: false,
+                  toolResultText: event.toolResult,
+                );
+                break;
+              }
             }
+            if (!found) print('[ChatNotifier] ⚠ no streaming pill found for toolResult!');
+            state = updated;
           }
-          if (!found) print('[ChatNotifier] ⚠ no streaming pill found for toolResult!');
-          state = updated;
-        }
 
-        if (event.textDelta != null) {
-          buffer.write(event.textDelta);
-          if (DateTime.now().difference(lastFlush) >= flushInterval) {
-            flushBuffer();
-          }
-        }
-
-        if (event.isDone) {
-          final resp = event.finalResponse;
-          final finalText = resp?.content ?? buffer.toString();
-          final updated = List<ChatMessage>.from(state);
-          updated[updated.length - 1] = updated.last.copyWith(
-            text: finalText,
-            isStreaming: false,
-            isError: resp?.isError ?? false,
-            errorStatusCode: resp?.errorStatusCode,
-            errorTitle: resp?.errorTitle,
-            errorCtaUrl: resp?.errorCtaUrl,
-            errorCtaLabel: resp?.errorCtaLabel,
-          );
-          state = updated;
-
-          // Route the response back to the originating channel (Telegram,
-          // Discord, etc.) so the user sees it there too — not just in the
-          // app UI. Webchat sessions don't need this because the UI *is*
-          // the channel.
-          if (channelType != 'webchat' && finalText.trim().isNotEmpty) {
-            try {
-              final router = ref.read(channelRouterProvider);
-              await router.sendMessage(
-                OutgoingMessage(
-                  channelType: channelType,
-                  chatId: chatId,
-                  text: finalText,
-                ),
-              );
-            } catch (e) {
-              Logger('ChatNotifier').warning(
-                  'Failed to route response to $channelType', e);
+          if (event.textDelta != null) {
+            buffer.write(event.textDelta);
+            if (DateTime.now().difference(lastFlush) >= flushInterval) {
+              flushBuffer();
             }
           }
 
-          if (_isAppInBackground && finalText.trim().isNotEmpty) {
-            _sendBackgroundNotification(finalText);
+          if (event.isDone) {
+            final resp = event.finalResponse;
+            final finalText = resp?.content ?? buffer.toString();
+            final updated = List<ChatMessage>.from(state);
+            updated[updated.length - 1] = updated.last.copyWith(
+              text: finalText,
+              isStreaming: false,
+              isError: resp?.isError ?? false,
+              errorStatusCode: resp?.errorStatusCode,
+              errorTitle: resp?.errorTitle,
+              errorCtaUrl: resp?.errorCtaUrl,
+              errorCtaLabel: resp?.errorCtaLabel,
+            );
+            state = updated;
+
+            // Route the response back to the originating channel (Telegram,
+            // Discord, etc.) so the user sees it there too — not just in the
+            // app UI. Webchat sessions don't need this because the UI *is*
+            // the channel.
+            if (channelType != 'webchat' && finalText.trim().isNotEmpty) {
+              try {
+                final router = ref.read(channelRouterProvider);
+                // ignore: unawaited_futures
+                router.sendMessage(
+                  OutgoingMessage(
+                    channelType: channelType,
+                    chatId: chatId,
+                    text: finalText,
+                  ),
+                );
+              } catch (e) {
+                Logger('ChatNotifier').warning(
+                    'Failed to route response to $channelType', e);
+              }
+            }
+
+            if (_isAppInBackground && finalText.trim().isNotEmpty) {
+              _sendBackgroundNotification(finalText);
+            }
           }
-        }
-      }
+        },
+      );
       // Flush any remaining buffered text if stream ended without isDone
       if (buffer.isNotEmpty && state.isNotEmpty && state.last.isStreaming) {
         flushBuffer();
