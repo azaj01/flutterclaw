@@ -823,6 +823,13 @@ final channelRouterProvider = Provider<ChannelRouter>((ref) {
           chatId: msg.chatId,
           contentBlocks: msg.contentBlocks,
           channelContext: msg.channelContext,
+          onIntermediateMessage: (text) => router.sendMessage(
+            OutgoingMessage(
+              channelType: msg.channelType,
+              chatId: msg.chatId,
+              text: text,
+            ),
+          ),
         );
 
         // If the user sent a voice message, reply with audio (voice-to-voice).

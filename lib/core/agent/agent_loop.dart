@@ -384,6 +384,11 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
   }
 
   /// Non-streaming: process a message and return the final response.
+  ///
+  /// [onIntermediateMessage] is called with each text segment the agent
+  /// produces before a tool call. This lets channel handlers forward
+  /// intermediate progress to the user (e.g. on Telegram) instead of only
+  /// sending the final response after the entire tool loop completes.
   Future<AgentResponse> processMessage(
     String sessionKey,
     String message, {
@@ -391,6 +396,7 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
     String chatId = 'default',
     List<Map<String, dynamic>>? contentBlocks,
     Map<String, dynamic>? channelContext,
+    Future<void> Function(String text)? onIntermediateMessage,
   }) async {
     await hookRunner?.runLifecycle(HookEvent.sessionStart, sessionKey);
     await sessionManager.getOrCreate(sessionKey, channelType, chatId);
@@ -598,13 +604,25 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
 
         if (response.toolCalls != null && response.toolCalls!.isNotEmpty) {
           // Persist assistant message with tool calls
+          final intermediateText = response.content ?? '';
           final assistantMsg = LlmMessage(
             role: 'assistant',
-            content: response.content ?? '',
+            content: intermediateText,
             toolCalls: response.toolCalls,
           );
           await sessionManager.addMessage(sessionKey, assistantMsg);
           loopMessages.add(assistantMsg);
+
+          // Forward intermediate text to the channel so the user sees
+          // progress between tool calls (not just the final response).
+          if (onIntermediateMessage != null &&
+              intermediateText.trim().isNotEmpty) {
+            try {
+              await onIntermediateMessage(intermediateText);
+            } catch (e) {
+              _log.warning('onIntermediateMessage failed', e);
+            }
+          }
 
           for (final tc in response.toolCalls!) {
             final args = _parseToolArgs(tc.function.arguments);
