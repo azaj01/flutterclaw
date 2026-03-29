@@ -44,6 +44,21 @@ import 'package:flutterclaw/tools/agent_tools.dart';
 import 'package:flutterclaw/tools/camera_tools.dart';
 import 'package:flutterclaw/tools/calendar_tools.dart';
 import 'package:flutterclaw/tools/contacts_tools.dart';
+import 'package:flutterclaw/tools/email_tools.dart';
+import 'package:flutterclaw/tools/qr_tools.dart';
+import 'package:flutterclaw/tools/oauth_tools.dart';
+import 'package:flutterclaw/services/oauth_service.dart';
+import 'package:flutterclaw/services/event_bus.dart';
+import 'package:flutterclaw/services/automation_service.dart';
+import 'package:flutterclaw/services/geofence_service.dart';
+import 'package:flutterclaw/services/watcher_service.dart';
+import 'package:flutterclaw/tools/automation_tools.dart';
+import 'package:flutterclaw/tools/geofence_tools.dart';
+import 'package:flutterclaw/tools/watcher_tools.dart';
+import 'package:flutterclaw/tools/spreadsheet_tools.dart';
+import 'package:flutterclaw/tools/routing_tools.dart';
+import 'package:flutterclaw/services/action_center_service.dart';
+import 'package:flutterclaw/tools/action_center_tools.dart';
 import 'package:flutterclaw/tools/device_tools.dart';
 import 'package:flutterclaw/tools/fs_tools.dart';
 import 'package:flutterclaw/tools/health_tools.dart';
@@ -432,11 +447,26 @@ final toolRegistryProvider = Provider<ToolRegistry>((ref) {
   registry.register(PickFileToWorkspaceTool(wsPath));
   registry.register(PickImageToWorkspaceTool(wsPath));
   registry.register(CameraTakePhotoTool());
+  registry.register(QrScanTool());
   registry.register(CameraRecordVideoTool());
   registry.register(GetLocationTool());
   registry.register(CalendarListEventsTool());
   registry.register(CalendarCreateEventTool());
   registry.register(ContactsSearchTool());
+  registry.register(ContactsCreateTool());
+  registry.register(ContactsUpdateTool());
+  registry.register(EmailSendTool(() => configManager.config.emailAccounts));
+  registry.register(EmailReadTool(() => configManager.config.emailAccounts));
+  registry.register(EmailFoldersTool(() => configManager.config.emailAccounts));
+  final oauthService = OAuthService();
+  registry.register(OAuthAuthorizeTool(
+    () => configManager.config.oauthConnections,
+    oauthService,
+  ));
+  registry.register(OAuthTokenTool(
+    () => configManager.config.oauthConnections,
+    oauthService,
+  ));
   registry.register(GetHealthDataTool());
   registry.register(HealthStatusTool());
   registry.register(MediaPlayTool());
@@ -619,6 +649,43 @@ final toolRegistryProvider = Provider<ToolRegistry>((ref) {
   registry.register(CronListTool(cronService: cronService));
   registry.register(CronDeleteTool(cronService: cronService));
   registry.register(CronUpdateTool(cronService: cronService));
+
+  // Automation rules tools
+  final automationService = ref.read(automationServiceProvider);
+  registry.register(AutomationCreateTool(automationService: automationService));
+  registry.register(AutomationListTool(automationService: automationService));
+  registry.register(AutomationDeleteTool(automationService: automationService));
+  registry.register(AutomationUpdateTool(automationService: automationService));
+
+  // Geofence tools
+  final geofenceService = ref.read(geofenceServiceProvider);
+  registry.register(GeofenceCreateTool(geofenceService: geofenceService));
+  registry.register(GeofenceListTool(geofenceService: geofenceService));
+  registry.register(GeofenceDeleteTool(geofenceService: geofenceService));
+  registry.register(GeofenceUpdateTool(geofenceService: geofenceService));
+
+  // Watcher tools
+  final watcherService = ref.read(watcherServiceProvider);
+  registry.register(WatchCreateTool(watcherService: watcherService));
+  registry.register(WatchListTool(watcherService: watcherService));
+  registry.register(WatchDeleteTool(watcherService: watcherService));
+  registry.register(WatchUpdateTool(watcherService: watcherService));
+  registry.register(WatchCheckTool(watcherService: watcherService));
+
+  // Spreadsheet/CSV tools
+  registry.register(SpreadsheetReadTool(configManager: configManager));
+  registry.register(SpreadsheetWriteTool(configManager: configManager));
+
+  // Cross-channel routing tools
+  registry.register(RouteCreateTool(automationService: automationService));
+  registry.register(RouteListTool(automationService: automationService));
+
+  // Action center tools
+  final actionCenterService = ref.read(actionCenterServiceProvider);
+  registry.register(ActionCenterAddTool(actionCenterService: actionCenterService));
+  registry.register(ActionCenterListTool(actionCenterService: actionCenterService));
+  registry.register(ActionCenterReadTool(actionCenterService: actionCenterService));
+  registry.register(ActionCenterDismissTool(actionCenterService: actionCenterService));
 
   // Shortcut tools
   final shortcutTools = ref.read(shortcutToolsServiceProvider);
@@ -904,6 +971,30 @@ final cronServiceProvider = Provider<CronService>((ref) {
   return CronService(configManager: ref.read(configManagerProvider));
 });
 
+final automationServiceProvider = Provider<AutomationService>((ref) {
+  return AutomationService(configManager: ref.read(configManagerProvider));
+});
+
+final geofenceServiceProvider = Provider<GeofenceService>((ref) {
+  return GeofenceService(configManager: ref.read(configManagerProvider));
+});
+
+final watcherServiceProvider = Provider<WatcherService>((ref) {
+  return WatcherService(configManager: ref.read(configManagerProvider));
+});
+
+final actionCenterServiceProvider = Provider<ActionCenterService>((ref) {
+  return ActionCenterService(configManager: ref.read(configManagerProvider));
+});
+
+final eventBusProvider = FutureProvider<EventBus>((ref) async {
+  final configManager = ref.read(configManagerProvider);
+  final ws = await configManager.workspacePath;
+  final bus = EventBus(workspacePath: ws);
+  ref.onDispose(bus.dispose);
+  return bus;
+});
+
 final deepLinkServiceProvider = Provider<DeepLinkService>((ref) {
   final service = DeepLinkService();
   service.init();
@@ -1134,9 +1225,26 @@ final channelStartupProvider = FutureProvider<void>((ref) async {
   // Initialize notification service eagerly so tool status notifications work
   await ref.read(notificationServiceProvider).initialize();
 
-  // Start cron service
+  // Start cron service with event bus
   final cronService = ref.read(cronServiceProvider);
+  final eventBus = await ref.read(eventBusProvider.future);
+  cronService.eventBus = eventBus;
   await cronService.start();
+
+  // Start automation service with event bus
+  final automationService = ref.read(automationServiceProvider);
+  automationService.eventBus = eventBus;
+  await automationService.start();
+
+  // Start geofence service with event bus
+  final geofenceService = ref.read(geofenceServiceProvider);
+  geofenceService.eventBus = eventBus;
+  await geofenceService.start();
+
+  // Start watcher service with event bus
+  final watcherService = ref.read(watcherServiceProvider);
+  watcherService.eventBus = eventBus;
+  await watcherService.start();
 
   // Notification service was already initialized above.
 

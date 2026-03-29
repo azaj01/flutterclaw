@@ -6,6 +6,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:flutterclaw/data/models/agent_profile.dart';
 import 'package:flutterclaw/data/models/mcp_server_config.dart';
 import 'package:flutterclaw/data/models/model_catalog.dart';
+import 'package:flutterclaw/services/email_service.dart';
+import 'package:flutterclaw/services/oauth_service.dart';
 
 /// Stores authentication credentials for a provider (API key + optional base URL).
 /// Credentials are stored at the provider level so all models from the same
@@ -609,6 +611,12 @@ class FlutterClawConfig {
   /// tools are dynamically registered into the ToolRegistry.
   final List<McpServerEntry> mcpServers;
 
+  /// Email accounts for SMTP send / IMAP read.
+  final List<EmailAccount> emailAccounts;
+
+  /// OAuth 2.0 connections (Google, Microsoft, Salesforce, etc.).
+  final List<OAuthConnection> oauthConnections;
+
   const FlutterClawConfig({
     this.agents = const AgentsConfig(),
     this.modelList = const [],
@@ -621,6 +629,8 @@ class FlutterClawConfig {
     this.activeAgentId,
     this.providerCredentials = const {},
     this.mcpServers = const [],
+    this.emailAccounts = const [],
+    this.oauthConnections = const [],
   });
 
   ModelEntry? getModel(String name) {
@@ -740,6 +750,16 @@ class FlutterClawConfig {
                 ?.map((e) => McpServerEntry.fromJson(e as Map<String, dynamic>))
                 .toList() ??
             [],
+        emailAccounts:
+            (json['email_accounts'] as List<dynamic>?)
+                ?.map((e) => EmailAccount.fromJson(e as Map<String, dynamic>))
+                .toList() ??
+            [],
+        oauthConnections:
+            (json['oauth_connections'] as List<dynamic>?)
+                ?.map((e) => OAuthConnection.fromJson(e as Map<String, dynamic>))
+                .toList() ??
+            [],
       );
 
   Map<String, dynamic> toJson() => {
@@ -758,6 +778,10 @@ class FlutterClawConfig {
       ),
     if (mcpServers.isNotEmpty)
       'mcp_servers': mcpServers.map((e) => e.toJson()).toList(),
+    if (emailAccounts.isNotEmpty)
+      'email_accounts': emailAccounts.map((e) => e.toJson()).toList(),
+    if (oauthConnections.isNotEmpty)
+      'oauth_connections': oauthConnections.map((e) => e.toJson()).toList(),
   };
 
   FlutterClawConfig copyWith({
@@ -772,6 +796,8 @@ class FlutterClawConfig {
     String? activeAgentId,
     Map<String, ProviderCredential>? providerCredentials,
     List<McpServerEntry>? mcpServers,
+    List<EmailAccount>? emailAccounts,
+    List<OAuthConnection>? oauthConnections,
   }) => FlutterClawConfig(
     agents: agents ?? this.agents,
     modelList: modelList ?? this.modelList,
@@ -784,6 +810,8 @@ class FlutterClawConfig {
     activeAgentId: activeAgentId ?? this.activeAgentId,
     providerCredentials: providerCredentials ?? this.providerCredentials,
     mcpServers: mcpServers ?? this.mcpServers,
+    emailAccounts: emailAccounts ?? this.emailAccounts,
+    oauthConnections: oauthConnections ?? this.oauthConnections,
   );
 }
 
