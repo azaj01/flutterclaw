@@ -3354,6 +3354,15 @@ class LiveSessionNotifier extends Notifier<LiveSessionState> {
       // Connect WebSocket.
       await liveService.connect(config: config);
 
+      // Ensure the webchat session exists before LiveAgentLoop writes to it.
+      // addMessage silently drops messages if _meta[key] is null (session never created).
+      final keyParts = activeKey.split(':');
+      await sessionManager.getOrCreate(
+        activeKey,
+        keyParts[0],
+        keyParts.length > 1 ? keyParts.sublist(1).join(':') : 'default',
+      );
+
       // Create and start the agent loop.
       _agentLoop = LiveAgentLoop(
         liveService: liveService,

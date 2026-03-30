@@ -72,6 +72,14 @@ class _LiveVoiceOverlayState extends ConsumerState<LiveVoiceOverlay>
   int _prerollBytes = 0;
   bool _playerStarted = false;
 
+  /// True once [LiveTurnComplete] arrives; gates the debounce end-of-playback reset
+  /// so a brief gap between segments mid-turn doesn't prematurely clear the pipeline.
+  bool _networkTurnComplete = false;
+
+  /// True once [player.setAudioSource] has been called for the current turn's
+  /// [_livePlaylist]; used to distinguish "first start" from "resume after gap".
+  bool _playlistLoadedIntoPlayer = false;
+
   /// Serializes WAV write + [ConcatenatingAudioSource.add] so segment order matches PCM order.
   Future<void> _wavQueueTail = Future.value();
 
@@ -102,12 +110,14 @@ class _LiveVoiceOverlayState extends ConsumerState<LiveVoiceOverlay>
       handleAudioSessionActivation: false,
       audioLoadConfiguration: AudioLoadConfiguration(
         darwinLoadControl: DarwinLoadControl(
-          automaticallyWaitsToMinimizeStalling: true,
-          preferredForwardBufferDuration: Duration(seconds: 7),
+          automaticallyWaitsToMinimizeStalling: false,
+          preferredForwardBufferDuration: Duration(seconds: 2),
         ),
         androidLoadControl: AndroidLoadControl(
-          bufferForPlaybackDuration: Duration(milliseconds: 5500),
-          bufferForPlaybackAfterRebufferDuration: Duration(seconds: 10),
+          minBufferDuration: Duration(milliseconds: 2000),
+          maxBufferDuration: Duration(seconds: 10),
+          bufferForPlaybackDuration: Duration(milliseconds: 250),
+          bufferForPlaybackAfterRebufferDuration: Duration(milliseconds: 500),
         ),
       ),
     );
@@ -138,7 +148,8 @@ class _LiveVoiceOverlayState extends ConsumerState<LiveVoiceOverlay>
 
   void _subscribeToEvents() {
     final notifier = ref.read(liveSessionProvider.notifier);
-    _eventSub = notifier.agentEvents.listen((event) {
+    _eventSub = notifier.agentEvents.listen(
+      (event) {
       if (!mounted) return;
       switch (event) {
         case LiveAudioOutput(:final pcmData):
@@ -171,6 +182,16 @@ class _LiveVoiceOverlayState extends ConsumerState<LiveVoiceOverlay>
           if (_activeTool == name) setState(() => _activeTool = null);
 
         case LiveTurnComplete():
+          _networkTurnComplete = true;
+          if (_pcmBuffer.isEmpty && _livePlaylist == null && !_playerStarted) {
+            // Audio was already cleared (e.g. by a preceding LiveInterrupted).
+            if (_micHoldForAssistantPcm) {
+              _micHoldForAssistantPcm = false;
+              ref.read(liveSessionProvider.notifier).setLivePlaybackSuppressMic(false);
+            }
+            if (_modelSpeaking) setState(() => _modelSpeaking = false);
+            return;
+          }
           _flushSegment();
           _enqueueEnsurePlaybackStarted();
           setState(() => _modelSpeaking = false);
@@ -189,7 +210,12 @@ class _LiveVoiceOverlayState extends ConsumerState<LiveVoiceOverlay>
         case LiveSessionReady():
           setState(() => _isConnecting = false);
       }
-    });
+      },
+      onError: (Object error, StackTrace stack) {
+        debugPrint('[LiveAudio] agent event stream error: $error');
+        if (mounted) _stopAndClearAudio();
+      },
+    );
   }
 
   // --- Audio helpers ---
@@ -257,10 +283,12 @@ class _LiveVoiceOverlayState extends ConsumerState<LiveVoiceOverlay>
       if (gen != _liveAudioGeneration) return;
       _prerollBytes += pcm.length;
 
-      final shouldStartPreroll =
-          !_playerStarted && _prerollBytes >= _kStartThreshold;
-      if (shouldStartPreroll) {
-        await _startConcatenatedPlayback(_livePlayer, gen);
+      if (!_playerStarted) {
+        if (_playlistLoadedIntoPlayer) {
+          await _resumeFromGap(_livePlayer, gen);
+        } else if (_prerollBytes >= _kStartThreshold) {
+          await _startConcatenatedPlayback(_livePlayer, gen);
+        }
       }
     } catch (e) {
       debugPrint('[LiveAudio] write error: $e');
@@ -273,7 +301,11 @@ class _LiveVoiceOverlayState extends ConsumerState<LiveVoiceOverlay>
     if (_playerStarted) return;
     final playlist = _livePlaylist;
     if (playlist == null || playlist.children.isEmpty) return;
-    await _startConcatenatedPlayback(_livePlayer, gen);
+    if (_playlistLoadedIntoPlayer) {
+      await _resumeFromGap(_livePlayer, gen);
+    } else {
+      await _startConcatenatedPlayback(_livePlayer, gen);
+    }
   }
 
   Future<void> _startConcatenatedPlayback(AudioPlayer player, int gen) async {
@@ -291,6 +323,7 @@ class _LiveVoiceOverlayState extends ConsumerState<LiveVoiceOverlay>
         _playerStarted = false;
         return;
       }
+      _playlistLoadedIntoPlayer = true;
       await player.play();
       if (mounted) {
         ref
@@ -306,6 +339,31 @@ class _LiveVoiceOverlayState extends ConsumerState<LiveVoiceOverlay>
       if (mounted) {
         ref.read(liveSessionProvider.notifier).setLivePlaybackSuppressMic(false);
       }
+    }
+  }
+
+  /// Resume playback after a mid-turn gap: seek to the newly added segment and play.
+  /// Avoids calling [setAudioSource] again (which would reset position to the start).
+  Future<void> _resumeFromGap(AudioPlayer player, int gen) async {
+    if (gen != _liveAudioGeneration || _playerStarted) return;
+    final playlist = _livePlaylist;
+    if (playlist == null || playlist.children.isEmpty) return;
+    _playerStarted = true;
+    try {
+      if (gen != _liveAudioGeneration) {
+        _playerStarted = false;
+        return;
+      }
+      await player.seek(Duration.zero, index: playlist.length - 1);
+      if (gen != _liveAudioGeneration) {
+        _playerStarted = false;
+        return;
+      }
+      await player.play();
+      _armPlaybackEndListener(gen);
+    } catch (e) {
+      debugPrint('[LiveAudio] resume from gap error: $e');
+      _playerStarted = false;
     }
   }
 
@@ -332,6 +390,20 @@ class _LiveVoiceOverlayState extends ConsumerState<LiveVoiceOverlay>
       final likelyDone = state == ProcessingState.completed ||
           (state == ProcessingState.idle && !_livePlayer.playing);
       if (!likelyDone) return;
+
+      if (!_networkTurnComplete) {
+        // Network turn isn't done: player ran dry between segments (segment gap).
+        // Mark as stopped so the next _writeAndQueueWavInternal triggers _resumeFromGap.
+        // Do NOT reset _livePlaylist or _playlistLoadedIntoPlayer — we'll resume in-place.
+        _awaitingLocalPlaybackEnd = false;
+        _playerStarted = false;
+        _playerCompleteSub?.cancel();
+        _playerCompleteSub = null;
+        _playerStateSub?.cancel();
+        _playerStateSub = null;
+        return;
+      }
+
       _playbackEndDebounce?.cancel();
       _playbackEndDebounce = Timer(const Duration(milliseconds: 180), () {
         _playbackEndDebounce = null;
@@ -342,6 +414,8 @@ class _LiveVoiceOverlayState extends ConsumerState<LiveVoiceOverlay>
         _playerStarted = false;
         _micHoldForAssistantPcm = false;
         _livePlaylist = null;
+        _playlistLoadedIntoPlayer = false;
+        _networkTurnComplete = false;
         _playerStateSub?.cancel();
         _playerStateSub = null;
         ref
@@ -366,6 +440,8 @@ class _LiveVoiceOverlayState extends ConsumerState<LiveVoiceOverlay>
     _livePlaylist = null;
     _prerollBytes = 0;
     _playerStarted = false;
+    _networkTurnComplete = false;
+    _playlistLoadedIntoPlayer = false;
     for (final f in List.of(_tempFiles)) {
       File(f).delete().ignore();
     }
