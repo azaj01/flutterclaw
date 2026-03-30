@@ -154,6 +154,10 @@ class AgentsDefaults {
   /// voice call for bootstrap instead of a silent REST hatch.
   final bool preferLiveVoiceBootstrap;
 
+  /// Prebuilt voice for Gemini Live audio output (default: 'Puck').
+  /// See [kLiveVoices] for the full list of available voices.
+  final String liveVoiceName;
+
   const AgentsDefaults({
     this.workspace = '~/.flutterclaw/workspace',
     this.modelName = 'gpt-4o',
@@ -168,6 +172,7 @@ class AgentsDefaults {
     this.typingMode = 'instant',
     this.liveVoiceModelId,
     this.preferLiveVoiceBootstrap = false,
+    this.liveVoiceName = 'Puck',
   });
 
   factory AgentsDefaults.fromJson(Map<String, dynamic> json) => AgentsDefaults(
@@ -187,6 +192,7 @@ class AgentsDefaults {
     liveVoiceModelId: json['live_voice_model_id'] as String?,
     preferLiveVoiceBootstrap:
         json['prefer_live_voice_bootstrap'] as bool? ?? false,
+    liveVoiceName: json['live_voice_name'] as String? ?? 'Puck',
   );
 
   Map<String, dynamic> toJson() => {
@@ -203,6 +209,7 @@ class AgentsDefaults {
     'typing_mode': typingMode,
     if (liveVoiceModelId != null) 'live_voice_model_id': liveVoiceModelId,
     'prefer_live_voice_bootstrap': preferLiveVoiceBootstrap,
+    'live_voice_name': liveVoiceName,
   };
 
   AgentsDefaults copyWith({
@@ -220,6 +227,7 @@ class AgentsDefaults {
     String? liveVoiceModelId,
     bool? preferLiveVoiceBootstrap,
     bool clearLiveVoiceModelId = false,
+    String? liveVoiceName,
   }) {
     return AgentsDefaults(
       workspace: workspace ?? this.workspace,
@@ -238,6 +246,7 @@ class AgentsDefaults {
           : (liveVoiceModelId ?? this.liveVoiceModelId),
       preferLiveVoiceBootstrap:
           preferLiveVoiceBootstrap ?? this.preferLiveVoiceBootstrap,
+      liveVoiceName: liveVoiceName ?? this.liveVoiceName,
     );
   }
 }

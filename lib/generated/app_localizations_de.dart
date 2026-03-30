@@ -725,6 +725,9 @@ class AppLocalizationsDe extends AppLocalizations {
       'On a new empty chat with BOOTSTRAP.md, start a voice call instead of a silent text hatch (when Live is available).';
 
   @override
+  String get liveVoiceNameLabel => 'Voice';
+
+  @override
   String get firstHatchModeChoiceTitle => 'Wie möchtest du starten?';
 
   @override

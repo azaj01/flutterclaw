@@ -10,6 +10,40 @@ import 'package:flutterclaw/l10n/l10n_extension.dart';
 import 'package:flutterclaw/services/analytics_service.dart';
 import 'package:flutterclaw/ui/widgets/provider_brand_icon.dart';
 
+/// Gemini Live prebuilt voices with their personality descriptions.
+const Map<String, String> kLiveVoices = {
+  'Puck': 'Upbeat',
+  'Charon': 'Informational',
+  'Kore': 'Firm',
+  'Fenrir': 'Excitable',
+  'Aoede': 'Breezy',
+  'Leda': 'Youthful',
+  'Orus': 'Firm',
+  'Autonoe': 'Bright',
+  'Enceladus': 'Breathy',
+  'Iapetus': 'Clear',
+  'Umbriel': 'Easy-going',
+  'Algieba': 'Smooth',
+  'Despina': 'Smooth',
+  'Erinome': 'Clear',
+  'Algenib': 'Gravelly',
+  'Rasalgethi': 'Informational',
+  'Laomedeia': 'Upbeat',
+  'Achernar': 'Soft',
+  'Alnilam': 'Firm',
+  'Schedar': 'Even',
+  'Gacrux': 'Mature',
+  'Pulcherrima': 'Forward',
+  'Achird': 'Friendly',
+  'Zubenelgenubi': 'Casual',
+  'Vindemiatrix': 'Gentle',
+  'Sadachbia': 'Lively',
+  'Sadaltager': 'Knowledgeable',
+  'Sulafat': 'Warm',
+  'Zephyr': 'Bright',
+  'Shimmer': 'Clear',
+};
+
 /// Providers & Models settings sub-screen.
 class ProvidersModelsScreen extends ConsumerStatefulWidget {
   const ProvidersModelsScreen({super.key});
@@ -350,6 +384,43 @@ class _ProvidersModelsScreenState extends ConsumerState<ProvidersModelsScreen> {
                 await cm.save();
                 setState(() {});
               },
+            ),
+            const SizedBox(height: 4),
+            Card(
+              child: Padding(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: DropdownButtonFormField<String>(
+                  value: kLiveVoices.containsKey(
+                          config.agents.defaults.liveVoiceName)
+                      ? config.agents.defaults.liveVoiceName
+                      : 'Puck',
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    border: InputBorder.none,
+                    labelText: context.l10n.liveVoiceNameLabel,
+                  ),
+                  items: kLiveVoices.entries
+                      .map(
+                        (e) => DropdownMenuItem<String>(
+                          value: e.key,
+                          child: Text('${e.key} — ${e.value}'),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) async {
+                    if (v == null) return;
+                    final cm = ref.read(configManagerProvider);
+                    final next = cm.config.agents.defaults
+                        .copyWith(liveVoiceName: v);
+                    cm.update(cm.config.copyWith(
+                      agents: cm.config.agents.copyWith(defaults: next),
+                    ));
+                    await cm.save();
+                    setState(() {});
+                  },
+                ),
+              ),
             ),
           ],
 

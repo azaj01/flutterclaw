@@ -1196,6 +1196,10 @@
   "@preferLiveVoiceBootstrapSubtitle": {
     "description": "Settings switch subtitle for voice bootstrap"
   },
+  "liveVoiceNameLabel": "Voice",
+  "@liveVoiceNameLabel": {
+    "description": "Dropdown label for Gemini Live voice name selector"
+  },
   "firstHatchModeChoiceTitle": "How would you like to get started?",
   "@firstHatchModeChoiceTitle": {
     "description": "One-time dialog after onboarding: title for chat vs voice bootstrap"

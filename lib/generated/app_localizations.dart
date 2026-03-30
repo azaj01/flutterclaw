@@ -1412,6 +1412,12 @@ abstract class AppLocalizations {
   /// **'On a new empty chat with BOOTSTRAP.md, start a voice call instead of a silent text hatch (when Live is available).'**
   String get preferLiveVoiceBootstrapSubtitle;
 
+  /// Dropdown label for Gemini Live voice name selector
+  ///
+  /// In en, this message translates to:
+  /// **'Voice'**
+  String get liveVoiceNameLabel;
+
   /// One-time dialog after onboarding: title for chat vs voice bootstrap
   ///
   /// In en, this message translates to:

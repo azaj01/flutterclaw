@@ -97,6 +97,7 @@ import 'package:flutterclaw/tools/mcp_proxy_tool.dart';
 import 'package:flutterclaw/tools/mcp_management_tools.dart';
 import 'package:flutterclaw/tools/tts_tool.dart';
 import 'package:flutterclaw/tools/pdf_tool.dart';
+import 'package:flutterclaw/tools/live_voice_tool.dart';
 import 'package:flutterclaw/services/connectivity_service.dart';
 import 'package:flutterclaw/services/battery_service.dart';
 import 'package:flutterclaw/services/auth_profile_service.dart';
@@ -776,6 +777,8 @@ final toolRegistryProvider = Provider<ToolRegistry>((ref) {
 
   // MCP server management tools — let the agent configure MCP servers conversationally.
   final mcpManager = ref.read(mcpClientManagerProvider);
+  registry.register(SetLiveVoiceTool(configManager));
+
   registry.register(McpServerListTool(
       configManager: configManager, mcpManager: mcpManager));
   registry.register(
@@ -3352,6 +3355,7 @@ class LiveSessionNotifier extends Notifier<LiveSessionState> {
         model: 'models/$liveModelId',
         systemInstruction: systemInstruction,
         tools: geminiTools.isNotEmpty ? geminiTools : null,
+        voiceName: configManager.config.agents.defaults.liveVoiceName,
         responseModalities: const ['AUDIO'],
       );
 
