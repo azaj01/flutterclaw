@@ -3315,7 +3315,11 @@ class LiveSessionNotifier extends Notifier<LiveSessionState> {
           'You are in a real-time voice call. Animate naturally — speak in the '
           'same manner as if you were in text chat. Follow workspace instructions, '
           'BOOTSTRAP when it applies (e.g. first hatch), and use tools when the '
-          'user asks for something that tools can do.';
+          'user asks for something that tools can do.\n\n'
+          'IMPORTANT — tools that require user interaction (e.g. web_browse with '
+          'action "request_user_action" to solve a CAPTCHA or complete a login): '
+          'ALWAYS speak to the user FIRST to explain what you need them to do and '
+          'why, THEN call the tool. Never open the browser silently.';
       const liveSystemMaxChars = 150000;
       var transcriptBudget =
           liveSystemMaxChars - fullPrompt.length - voiceNote.length - 2;
