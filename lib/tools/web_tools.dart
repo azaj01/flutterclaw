@@ -377,6 +377,15 @@ class WebFetchTool extends Tool {
               buffer.write(text);
             }
             return;
+          case 'img':
+            final src = node.attributes['src'];
+            if (src != null && src.isNotEmpty) {
+              final alt = (node.attributes['alt']?.trim() ?? '')
+                  .replaceAll('[', r'\[')
+                  .replaceAll(']', r'\]');
+              buffer.write('![$alt]($src)');
+            }
+            return;
           case 'li':
             buffer.write('- ');
             for (final child in node.nodes) visit(child);
@@ -403,5 +412,193 @@ class WebFetchTool extends Tool {
 
   String _textContent(dom.Element el) {
     return el.text.trim();
+  }
+}
+
+/// Searches the web for images. Returns image URLs ready to embed as markdown.
+class WebImageSearchTool extends Tool {
+  final FlutterClawConfig? config;
+  final Dio _dio = Dio();
+
+  WebImageSearchTool({this.config});
+
+  @override
+  String get name => 'web_image_search';
+
+  @override
+  String get description =>
+      'Search the web for images. Returns image URLs with titles, ready to '
+      'embed in your response as markdown: ![title](url). '
+      'Use this when the user asks to find, show, or search for images or photos.';
+
+  @override
+  Map<String, dynamic> get parameters => {
+        'type': 'object',
+        'properties': {
+          'query': {
+            'type': 'string',
+            'description': 'Image search query.',
+          },
+          'count': {
+            'type': 'integer',
+            'description': 'Number of images to return (default 5, max 10).',
+          },
+        },
+        'required': ['query'],
+      };
+
+  @override
+  Future<ToolResult> execute(Map<String, dynamic> args) async {
+    final query = args['query'] as String?;
+    if (query == null || query.isEmpty) {
+      return ToolResult.error('query is required');
+    }
+    final count = (args['count'] as int? ?? 5).clamp(1, 10);
+
+    final web = config?.tools.web ?? const WebToolsConfig();
+
+    if (web.brave.enabled && web.brave.apiKey != null) {
+      return _searchBraveImages(query, count, web.brave);
+    }
+    if (web.duckduckgo.enabled) {
+      return _searchDuckDuckGoImages(query, count);
+    }
+
+    return ToolResult.error('No web search provider configured');
+  }
+
+  Future<ToolResult> _searchDuckDuckGoImages(String query, int count) async {
+    try {
+      final encoded = Uri.encodeComponent(query);
+
+      // Step 1: get vqd token
+      final tokenResponse = await _dio.get<String>(
+        'https://duckduckgo.com/?q=$encoded&ia=images&iax=images',
+        options: Options(
+          headers: {
+            'User-Agent':
+                'Mozilla/5.0 (compatible; FlutterClaw/1.0; +https://flutterclaw.ai)',
+          },
+          responseType: ResponseType.plain,
+          validateStatus: (s) => s != null && s < 400,
+          receiveTimeout: const Duration(seconds: 15),
+        ),
+      );
+
+      final body = tokenResponse.data ?? '';
+      final vqdMatch = RegExp(r'vqd="([^"]+)"').firstMatch(body) ??
+          RegExp(r"vqd='([^']+)'").firstMatch(body) ??
+          RegExp(r'vqd=([0-9\-]+)').firstMatch(body);
+
+      if (vqdMatch == null) {
+        return ToolResult.error(
+          'Could not start image search session. Try again or use a different query.',
+        );
+      }
+      final vqd = vqdMatch.group(1)!;
+
+      // Step 2: fetch image results
+      final imgResponse = await _dio.get<Map<String, dynamic>>(
+        'https://duckduckgo.com/i.js',
+        queryParameters: {
+          'l': 'us-en',
+          'o': 'json',
+          'q': query,
+          'vqd': vqd,
+          'f': ',,,,,',
+          'p': '1',
+        },
+        options: Options(
+          headers: {
+            'User-Agent':
+                'Mozilla/5.0 (compatible; FlutterClaw/1.0; +https://flutterclaw.ai)',
+            'Referer': 'https://duckduckgo.com/',
+          },
+          validateStatus: (s) => s != null && s < 400,
+          receiveTimeout: const Duration(seconds: 15),
+        ),
+      );
+
+      if (imgResponse.data == null) {
+        return ToolResult.error('Image search returned no data');
+      }
+
+      final results = (imgResponse.data!['results'] as List<dynamic>?) ?? [];
+      if (results.isEmpty) {
+        return ToolResult.success('No images found for: $query');
+      }
+
+      return _formatResults(query, results.take(count), (r) {
+        final m = r as Map<String, dynamic>;
+        return (
+          imageUrl: m['image'] as String? ?? '',
+          title: m['title'] as String? ?? '',
+          sourceUrl: m['url'] as String? ?? '',
+        );
+      });
+    } catch (e) {
+      return ToolResult.error('Image search failed: $e');
+    }
+  }
+
+  Future<ToolResult> _searchBraveImages(
+    String query,
+    int count,
+    WebSearchProviderConfig cfg,
+  ) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        'https://api.search.brave.com/res/v1/images/search',
+        queryParameters: {'q': query, 'count': count},
+        options: Options(
+          headers: {'X-Subscription-Token': cfg.apiKey!},
+          validateStatus: (s) => s != null && s < 400,
+          receiveTimeout: const Duration(seconds: 15),
+        ),
+      );
+
+      if (response.data == null) {
+        return ToolResult.error('Brave image search API failed');
+      }
+
+      final results = (response.data!['results'] as List<dynamic>?) ?? [];
+      if (results.isEmpty) {
+        return ToolResult.success('No images found for: $query');
+      }
+
+      return _formatResults(query, results.take(count), (r) {
+        final m = r as Map<String, dynamic>;
+        final props = m['properties'] as Map<String, dynamic>? ?? {};
+        return (
+          imageUrl: props['url'] as String? ?? '',
+          title: m['title'] as String? ?? '',
+          sourceUrl: m['url'] as String? ?? '',
+        );
+      });
+    } catch (e) {
+      return ToolResult.error('Brave image search failed: $e');
+    }
+  }
+
+  ToolResult _formatResults(
+    String query,
+    Iterable<dynamic> items,
+    ({String imageUrl, String title, String sourceUrl}) Function(dynamic)
+        extract,
+  ) {
+    final lines = <String>['Found images for "$query":\n'];
+    var i = 1;
+    for (final item in items) {
+      final r = extract(item);
+      if (r.imageUrl.isEmpty) continue;
+      final title = r.title.isNotEmpty ? r.title : 'Image $i';
+      lines.add('$i. $title');
+      lines.add('   ![${title.replaceAll('[', r'\[').replaceAll(']', r'\]')}](${r.imageUrl})');
+      if (r.sourceUrl.isNotEmpty) lines.add('   Source: ${r.sourceUrl}');
+      lines.add('');
+      i++;
+    }
+    if (i == 1) return ToolResult.success('No images found for: $query');
+    return ToolResult.success(lines.join('\n'));
   }
 }
