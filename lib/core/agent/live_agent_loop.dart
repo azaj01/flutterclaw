@@ -90,6 +90,9 @@ class LiveAgentLoop {
   /// In-flight tool executions (for cancellation support).
   final Map<String, _PendingTool> _pendingTools = {};
 
+  /// Remembered so [stop] can flush buffered transcripts.
+  String? _lastSessionKey;
+
   /// Events for the UI.
   Stream<LiveAgentEvent> get events => _eventController.stream;
 
@@ -101,6 +104,7 @@ class LiveAgentLoop {
 
   /// Start processing events from the live service for [sessionKey].
   void start(String sessionKey) {
+    _lastSessionKey = sessionKey;
     _liveSubscription?.cancel();
     _liveSubscription = liveService.events.listen(
       (event) => _handleEvent(event, sessionKey),
@@ -111,11 +115,16 @@ class LiveAgentLoop {
     );
   }
 
-  /// Stop processing events.
+  /// Stop processing events, flushing any buffered transcripts first.
   Future<void> stop() async {
     await _liveSubscription?.cancel();
     _liveSubscription = null;
     _cancelAllPendingTools();
+    // Flush any buffered transcripts that haven't been persisted yet
+    // (e.g. user ended the call before TurnComplete arrived).
+    if (_lastSessionKey != null) {
+      await _persistTurn(_lastSessionKey!);
+    }
   }
 
   Future<void> dispose() async {
@@ -125,7 +134,7 @@ class LiveAgentLoop {
 
   // -- Event Handling --
 
-  void _handleEvent(LiveEvent event, String sessionKey) {
+  Future<void> _handleEvent(LiveEvent event, String sessionKey) async {
     switch (event) {
       case SetupComplete():
         _eventController.add(const LiveSessionReady());
@@ -158,6 +167,8 @@ class LiveAgentLoop {
 
       case Disconnected():
         _cancelAllPendingTools();
+        // Flush any buffered transcripts before signalling disconnect.
+        await _persistTurn(sessionKey);
         _eventController.add(const LiveSessionDisconnected());
     }
   }
@@ -174,24 +185,24 @@ class LiveAgentLoop {
   }
 
   /// Persist the current turn's transcripts to the session.
-  void _persistTurn(String sessionKey) {
+  Future<void> _persistTurn(String sessionKey) async {
     final userText = _userTranscriptBuffer.toString();
     final modelText = _modelTranscriptBuffer.toString();
 
     if (userText.isNotEmpty) {
-      sessionManager.addMessage(
+      _userTranscriptBuffer.clear();
+      await sessionManager.addMessage(
         sessionKey,
         LlmMessage(role: 'user', content: userText),
       );
-      _userTranscriptBuffer.clear();
     }
 
     if (modelText.isNotEmpty) {
-      sessionManager.addMessage(
+      _modelTranscriptBuffer.clear();
+      await sessionManager.addMessage(
         sessionKey,
         LlmMessage(role: 'assistant', content: modelText),
       );
-      _modelTranscriptBuffer.clear();
     }
   }
 
