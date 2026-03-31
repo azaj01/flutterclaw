@@ -363,8 +363,21 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
         body: Column(
           children: [
             Expanded(
-              child: Stack(
-                children: [
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 300),
+                decoration: showLiveOverlay
+                    ? BoxDecoration(
+                        border: Border.all(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .primary
+                              .withValues(alpha: 0.20),
+                          width: 1.5,
+                        ),
+                      )
+                    : const BoxDecoration(),
+                child: Stack(
+                  children: [
                   messages.isEmpty
                       ? Padding(
                           padding: EdgeInsets.only(
@@ -440,6 +453,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
                   if (showLiveOverlay) const LiveVoiceOverlay(),
                 ],
               ),
+            ),
             ),
             ChatInputBar(
               controller: _controller,
