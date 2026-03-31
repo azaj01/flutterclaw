@@ -5,7 +5,6 @@
 library;
 
 import 'dart:async';
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -15,7 +14,6 @@ import 'package:flutterclaw/core/agent/live_agent_loop.dart';
 import 'package:flutterclaw/generated/app_localizations.dart';
 import 'package:flutterclaw/ui/theme/tokens.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:path_provider/path_provider.dart';
 
 /// Live call chrome heights — keep in sync with [LiveVoiceOverlay.listTopPaddingWhenLive].
 const double _kLiveHeaderHeight = 52;
@@ -45,78 +43,78 @@ class _LiveVoiceOverlayState extends ConsumerState<LiveVoiceOverlay>
   String? _activeTool;
 
   // --- Audio ---
-  final List<int> _pcmBuffer = [];
 
-  /// Gapless playlist — segments are appended while the player is running.
-  /// Null means the player is idle and the next segment must create a new source.
+  /// Accumulated PCM waiting to be flushed into a WAV segment.
+  final _pcmBuffer = BytesBuilder(copy: false);
+
+  /// Playlist of in-memory WAV segments for the current turn.
   ConcatenatingAudioSource? _livePlaylist;
 
-  /// Resets [_livePlaylist] when the player finishes naturally.
+  /// True once [play] has been called for this turn.
+  bool _playerStarted = false;
+
+  /// True once the playlist has been set as the player's audio source.
+  bool _playlistLoadedIntoPlayer = false;
+
+  /// Total PCM bytes accumulated for preroll check.
+  int _prerollBytes = 0;
+
+  /// Serializes async audio operations.
+  Future<void> _audioChainTail = Future.value();
+
+  /// Incremented on stop/clear so stale chain steps exit harmlessly.
+  int _liveAudioGeneration = 0;
+
+  /// True when the network has signalled [LiveTurnComplete] for this turn.
+  bool _networkTurnComplete = false;
+
+  /// Mic is cut for the current assistant audio stream.
+  bool _micHoldForAssistantPcm = false;
+
+  /// Playback must reach [PlayerState.playing] before we trust idle/completed
+  /// as "done" (iOS briefly reports idle right after [play]).
+  bool _sawPlayerAudibleThisArm = false;
+  StreamSubscription<PlayerState>? _playerStateSub;
   StreamSubscription? _playerCompleteSub;
 
-  /// True after [play] until local output is fully done (see [_armPlaybackEndListener]).
   bool _awaitingLocalPlaybackEnd = false;
   Timer? _playbackEndDebounce;
 
-  /// Mic is cut for the current assistant audio stream (first [LiveAudioOutput] → playback end).
-  bool _micHoldForAssistantPcm = false;
+  /// True when the player ran out of segments mid-turn (went completed/idle
+  /// before [_networkTurnComplete]). Next [_flushSegment] will resume playback.
+  bool _playerDry = false;
 
-  /// Playback must have reached [PlayerState.playing] before we trust idle/completed as "done"
-  /// (iOS often reports idle/!playing briefly right after [play]).
-  bool _sawPlayerAudibleThisArm = false;
-  StreamSubscription<PlayerState>? _playerStateSub;
+  /// Safety: if the player hasn't produced audio within this duration after
+  /// [play], force-unsuppress the mic to avoid permanent mute.
+  Timer? _micSafetyTimer;
+  static const _kMicSafetyTimeout = Duration(seconds: 6);
 
-  /// Bytes queued into [_livePlaylist] since the last [needsNew] reset.
-  /// play() is deferred until this exceeds [_kStartThreshold] to avoid
-  /// buffer-underrun glitches at the beginning of each turn.
-  int _prerollBytes = 0;
-  bool _playerStarted = false;
+  /// Segment flush threshold: 2 s at 24 kHz / 16-bit / mono = 96 000 B.
+  /// Uniform segment size ensures the next segment is accumulated in roughly
+  /// the same time the current one takes to play.
+  static const int _kFlushBytes = 96000;
 
-  /// True once [LiveTurnComplete] arrives; gates the debounce end-of-playback reset
-  /// so a brief gap between segments mid-turn doesn't prematurely clear the pipeline.
-  bool _networkTurnComplete = false;
+  /// Preroll before first [play]: same as one segment (2 s).
+  static const int _kPrerollBytes = 96000;
 
-  /// True once [player.setAudioSource] has been called for the current turn's
-  /// [_livePlaylist]; used to distinguish "first start" from "resume after gap".
-  bool _playlistLoadedIntoPlayer = false;
-
-  /// Serializes WAV write + [ConcatenatingAudioSource.add] so segment order matches PCM order.
-  Future<void> _wavQueueTail = Future.value();
-
-  /// Incremented in [_stopAndClearAudio] so in-flight queue steps exit without touching state.
-  int _liveAudioGeneration = 0;
-
-  /// Flush interval: 24 kHz × 2 B × 1.5 s = 72 000 bytes (fewer WAV handoffs at turn start).
-  static const int _kFlushBytes = 72000;
-
-  /// Preroll before first [play]: 3 s at 24 kHz mono 16-bit (144 000 B); extra headroom vs decoder/OS underrun.
-  static const int _kStartThreshold = 144000;
-
-  final List<String> _tempFiles = [];
-
-  /// Dedicated player: avoids audio_service main [AudioPlayer] contention and uses heavier OS buffering.
+  /// Dedicated player: avoids audio_service main [AudioPlayer] contention.
   late final AudioPlayer _livePlayer;
-
-  Directory? _cachedTempDir;
 
   @override
   void initState() {
     super.initState();
 
-    // Do not let just_audio reconfigure the session: [LiveSessionNotifier]
-    // already sets playAndRecord + voiceChat for AEC; a second activation
-    // fight breaks echo cancellation and can leak speaker audio to the mic path.
     _livePlayer = AudioPlayer(
       handleAudioSessionActivation: false,
       audioLoadConfiguration: AudioLoadConfiguration(
         darwinLoadControl: DarwinLoadControl(
           automaticallyWaitsToMinimizeStalling: false,
-          preferredForwardBufferDuration: Duration(seconds: 2),
+          preferredForwardBufferDuration: Duration(seconds: 4),
         ),
         androidLoadControl: AndroidLoadControl(
           minBufferDuration: Duration(milliseconds: 2000),
           maxBufferDuration: Duration(seconds: 10),
-          bufferForPlaybackDuration: Duration(milliseconds: 250),
+          bufferForPlaybackDuration: Duration(milliseconds: 200),
           bufferForPlaybackAfterRebufferDuration: Duration(milliseconds: 500),
         ),
       ),
@@ -153,21 +151,17 @@ class _LiveVoiceOverlayState extends ConsumerState<LiveVoiceOverlay>
       if (!mounted) return;
       switch (event) {
         case LiveAudioOutput(:final pcmData):
-          // Cut mic as soon as assistant PCM arrives — during preroll the speaker is
-          // still silent locally but the server is already in "model speaking"; sending
-          // mic here triggers spurious LiveInterrupted / cut-off on the first word.
           if (!_micHoldForAssistantPcm && mounted) {
             _micHoldForAssistantPcm = true;
             ref.read(liveSessionProvider.notifier).setLivePlaybackSuppressMic(true);
           }
-          _pcmBuffer.addAll(pcmData);
+          _handleAudioChunk(pcmData);
           if (!_modelSpeaking) {
             setState(() {
               _modelSpeaking = true;
               _isConnecting = false;
             });
           }
-          if (_pcmBuffer.length >= _kFlushBytes) _flushSegment();
 
         case LiveUserTranscript():
           setState(() => _isConnecting = false);
@@ -182,18 +176,7 @@ class _LiveVoiceOverlayState extends ConsumerState<LiveVoiceOverlay>
           if (_activeTool == name) setState(() => _activeTool = null);
 
         case LiveTurnComplete():
-          _networkTurnComplete = true;
-          if (_pcmBuffer.isEmpty && _livePlaylist == null && !_playerStarted) {
-            // Audio was already cleared (e.g. by a preceding LiveInterrupted).
-            if (_micHoldForAssistantPcm) {
-              _micHoldForAssistantPcm = false;
-              ref.read(liveSessionProvider.notifier).setLivePlaybackSuppressMic(false);
-            }
-            if (_modelSpeaking) setState(() => _modelSpeaking = false);
-            return;
-          }
-          _flushSegment();
-          _enqueueEnsurePlaybackStarted();
+          _handleTurnComplete();
           setState(() => _modelSpeaking = false);
 
         case LiveInterrupted():
@@ -220,232 +203,253 @@ class _LiveVoiceOverlayState extends ConsumerState<LiveVoiceOverlay>
 
   // --- Audio helpers ---
 
-  void _flushSegment() {
-    if (_pcmBuffer.isEmpty) return;
-    final pcm = Uint8List.fromList(_pcmBuffer);
-    _pcmBuffer.clear();
+  void _handleAudioChunk(Uint8List pcmData) {
     final gen = _liveAudioGeneration;
-    _wavQueueTail = _wavQueueTail.then((_) async {
-      if (gen != _liveAudioGeneration) return;
-      try {
-        await _writeAndQueueWavInternal(pcm, gen);
-      } catch (e) {
-        debugPrint('[LiveAudio] queue error: $e');
-      }
-    });
-  }
 
-  /// After [LiveTurnComplete], play any buffered audio even if below [_kStartThreshold] (short replies).
-  void _enqueueEnsurePlaybackStarted() {
-    final gen = _liveAudioGeneration;
-    _wavQueueTail = _wavQueueTail.then((_) async {
-      if (gen != _liveAudioGeneration) return;
-      try {
-        await _ensurePlaybackStartedIfNeeded(gen);
-      } catch (e) {
-        debugPrint('[LiveAudio] ensure play error: $e');
-      }
-    });
-  }
+    _pcmBuffer.add(pcmData);
+    _prerollBytes += pcmData.length;
 
-  /// Write [pcm] as a WAV segment and append it to the gapless playlist.
-  ///
-  /// The first segment initialises the [ConcatenatingAudioSource] and starts
-  /// the player once preroll is met; subsequent segments are appended while
-  /// playback is already running.
-  Future<void> _writeAndQueueWavInternal(Uint8List pcm, int gen) async {
-    if (gen != _liveAudioGeneration) return;
-
-    final needsNew = _livePlaylist == null;
-    if (needsNew) {
-      if (gen != _liveAudioGeneration) return;
+    // Create playlist on first chunk.
+    if (_livePlaylist == null) {
       _livePlaylist = ConcatenatingAudioSource(
         children: [],
         useLazyPreparation: false,
       );
-      _prerollBytes = 0;
-      _playerStarted = false;
+      _audioChainTail = _audioChainTail.then((_) async {
+        if (gen != _liveAudioGeneration) return;
+        try {
+          await _livePlayer.setAudioSource(
+            _livePlaylist!,
+            preload: false,
+          );
+          _playlistLoadedIntoPlayer = true;
+        } catch (e) {
+          debugPrint('[LiveAudio] setAudioSource error: $e');
+        }
+      });
     }
-    final playlist = _livePlaylist!;
 
-    try {
-      final wav = _buildWav(pcm);
-      _cachedTempDir ??= await getTemporaryDirectory();
-      final dir = _cachedTempDir!;
-      if (gen != _liveAudioGeneration) return;
-      final path =
-          '${dir.path}/live_${DateTime.now().microsecondsSinceEpoch}.wav';
-      await File(path).writeAsBytes(wav);
-      if (gen != _liveAudioGeneration) return;
-      _tempFiles.add(path);
+    // Flush a segment when we have enough buffered PCM.
+    if (_pcmBuffer.length >= _kFlushBytes) {
+      _flushSegment(gen);
+    }
 
-      await playlist.add(AudioSource.file(path));
-      if (gen != _liveAudioGeneration) return;
-      _prerollBytes += pcm.length;
+    // Start playback once we've received enough total PCM (preroll).
+    if (!_playerStarted && _prerollBytes >= _kPrerollBytes) {
+      _startPlayback(gen);
+    }
+  }
 
-      if (!_playerStarted) {
-        if (_playlistLoadedIntoPlayer) {
-          await _resumeFromGap(_livePlayer, gen);
-        } else if (_prerollBytes >= _kStartThreshold) {
-          await _startConcatenatedPlayback(_livePlayer, gen);
+  void _flushSegment(int gen) {
+    if (_pcmBuffer.length == 0) return;
+
+    final pcmBytes = Uint8List.fromList(_pcmBuffer.takeBytes());
+    final wavBytes = _buildWav(pcmBytes, sampleRate: 24000);
+    final source = _InMemoryWavSource(wavBytes);
+
+    _audioChainTail = _audioChainTail.then((_) async {
+      if (gen != _liveAudioGeneration) return;
+      if (_livePlaylist == null) return;
+      try {
+        await _livePlaylist!.add(source);
+      } catch (e) {
+        debugPrint('[LiveAudio] segment add error: $e');
+        return;
+      }
+
+      // Resume if the player ran dry waiting for this segment.
+      if (_playerDry && gen == _liveAudioGeneration) {
+        _playerDry = false;
+        _sawPlayerAudibleThisArm = false; // re-arm audible guard
+        try {
+          final idx = _livePlaylist!.length - 1;
+          await _livePlayer.seek(Duration.zero, index: idx);
+          await _livePlayer.play();
+        } catch (e) {
+          debugPrint('[LiveAudio] resume-from-gap error: $e');
         }
       }
-    } catch (e) {
-      debugPrint('[LiveAudio] write error: $e');
-      if (needsNew) _livePlaylist = null;
-    }
+    });
   }
 
-  Future<void> _ensurePlaybackStartedIfNeeded(int gen) async {
-    if (gen != _liveAudioGeneration) return;
-    if (_playerStarted) return;
-    final playlist = _livePlaylist;
-    if (playlist == null || playlist.children.isEmpty) return;
-    if (_playlistLoadedIntoPlayer) {
-      await _resumeFromGap(_livePlayer, gen);
-    } else {
-      await _startConcatenatedPlayback(_livePlayer, gen);
-    }
-  }
-
-  Future<void> _startConcatenatedPlayback(AudioPlayer player, int gen) async {
-    if (gen != _liveAudioGeneration || _playerStarted) return;
-    final playlist = _livePlaylist;
-    if (playlist == null || playlist.children.isEmpty) return;
+  void _startPlayback(int gen) {
     _playerStarted = true;
-    try {
-      if (gen != _liveAudioGeneration) {
+
+    // Flush whatever PCM we have into the first segment.
+    _flushSegment(gen);
+
+    _audioChainTail = _audioChainTail.then((_) async {
+      if (gen != _liveAudioGeneration) return;
+      if (!_playlistLoadedIntoPlayer) return;
+      try {
+        await _livePlayer.play();
+        if (gen != _liveAudioGeneration) return;
+        if (mounted) {
+          ref.read(liveSessionProvider.notifier).setLivePlaybackSuppressMic(true);
+        }
+        _armPlaybackEndListener(gen);
+        _startMicSafetyTimer();
+      } catch (e) {
+        debugPrint('[LiveAudio] play error: $e');
         _playerStarted = false;
-        return;
+        _unsuppressMic();
       }
-      await player.setAudioSource(playlist);
-      if (gen != _liveAudioGeneration) {
-        _playerStarted = false;
-        return;
+    });
+  }
+
+  void _handleTurnComplete() {
+    final gen = _liveAudioGeneration;
+    _networkTurnComplete = true;
+
+    // Flush any remaining buffered PCM.
+    if (_pcmBuffer.length > 0) {
+      _flushSegment(gen);
+    }
+
+    if (!_playerStarted) {
+      if (_prerollBytes > 0) {
+        // Short response — force play with whatever we have.
+        _playerStarted = true;
+        _flushSegment(gen);
+        _audioChainTail = _audioChainTail.then((_) async {
+          if (gen != _liveAudioGeneration) return;
+          if (!_playlistLoadedIntoPlayer) return;
+          try {
+            await _livePlayer.play();
+            if (gen != _liveAudioGeneration) return;
+            _armPlaybackEndListener(gen);
+            _startMicSafetyTimer();
+          } catch (e) {
+            debugPrint('[LiveAudio] short response play error: $e');
+            _cleanupAfterPlayback();
+          }
+        });
+      } else {
+        // Turn complete with no audio at all — just unsuppress mic.
+        _unsuppressMic();
       }
-      _playlistLoadedIntoPlayer = true;
-      await player.play();
-      if (mounted) {
-        ref
-            .read(liveSessionProvider.notifier)
-            .setLivePlaybackSuppressMic(true);
-      }
-      _armPlaybackEndListener(gen);
-    } catch (e) {
-      debugPrint('[LiveAudio] playback start error: $e');
-      _playerStarted = false;
-      _awaitingLocalPlaybackEnd = false;
-      _playbackEndDebounce?.cancel();
-      if (mounted) {
-        ref.read(liveSessionProvider.notifier).setLivePlaybackSuppressMic(false);
-      }
+    } else if (_playerDry && _pcmBuffer.length == 0) {
+      // Player was dry and there's nothing more to flush — truly done.
+      // (If we DID flush above, _flushSegment's resume will handle playback
+      // and the listener will detect completion after the final segment.)
+      _audioChainTail = _audioChainTail.then((_) {
+        if (gen != _liveAudioGeneration) return;
+        _cleanupAfterPlayback();
+      });
     }
   }
 
-  /// Resume playback after a mid-turn gap: seek to the newly added segment and play.
-  /// Avoids calling [setAudioSource] again (which would reset position to the start).
-  Future<void> _resumeFromGap(AudioPlayer player, int gen) async {
-    if (gen != _liveAudioGeneration || _playerStarted) return;
-    final playlist = _livePlaylist;
-    if (playlist == null || playlist.children.isEmpty) return;
-    _playerStarted = true;
-    try {
-      if (gen != _liveAudioGeneration) {
-        _playerStarted = false;
-        return;
-      }
-      await player.seek(Duration.zero, index: playlist.length - 1);
-      if (gen != _liveAudioGeneration) {
-        _playerStarted = false;
-        return;
-      }
-      await player.play();
-      _armPlaybackEndListener(gen);
-    } catch (e) {
-      debugPrint('[LiveAudio] resume from gap error: $e');
-      _playerStarted = false;
-    }
-  }
-
-  /// Unsuppress mic after playback. Uses [completed] or [idle] when not playing
-  /// — `.first` on `completed` alone can fire too early on iOS or never after
-  /// [stop], leaving the mic dead for the whole call.
   void _armPlaybackEndListener(int gen) {
     _playerCompleteSub?.cancel();
     _playerStateSub?.cancel();
     _playbackEndDebounce?.cancel();
     _awaitingLocalPlaybackEnd = true;
     _sawPlayerAudibleThisArm = false;
+
     _playerStateSub = _livePlayer.playerStateStream.listen((ps) {
       if (!mounted || gen != _liveAudioGeneration) return;
-      if (ps.playing) _sawPlayerAudibleThisArm = true;
+      if (ps.playing) {
+        _sawPlayerAudibleThisArm = true;
+        _cancelMicSafetyTimer();
+      }
     });
+
     _playerCompleteSub = _livePlayer.processingStateStream.listen((state) {
       if (!mounted || gen != _liveAudioGeneration || !_awaitingLocalPlaybackEnd) {
         return;
       }
-      // Ignore idle/complete until audio has actually started — avoids iOS firing
-      // idle+!playing in the gap between setSource and audible output.
       if (!_sawPlayerAudibleThisArm) return;
-      final likelyDone = state == ProcessingState.completed ||
-          (state == ProcessingState.idle && !_livePlayer.playing);
-      if (!likelyDone) return;
 
-      if (!_networkTurnComplete) {
-        // Network turn isn't done: player ran dry between segments (segment gap).
-        // Mark as stopped so the next _writeAndQueueWavInternal triggers _resumeFromGap.
-        // Do NOT reset _livePlaylist or _playlistLoadedIntoPlayer — we'll resume in-place.
-        _awaitingLocalPlaybackEnd = false;
-        _playerStarted = false;
-        _playerCompleteSub?.cancel();
-        _playerCompleteSub = null;
-        _playerStateSub?.cancel();
-        _playerStateSub = null;
+      final playerStopped = state == ProcessingState.completed ||
+          (state == ProcessingState.idle && !_livePlayer.playing);
+      if (!playerStopped) return;
+
+      // Player ran out of segments. Is it truly done or just waiting for more?
+      final trulyDone = _networkTurnComplete && _pcmBuffer.length == 0;
+      if (!trulyDone) {
+        // Mid-turn gap — next _flushSegment will resume playback.
+        _playerDry = true;
         return;
       }
 
       _playbackEndDebounce?.cancel();
-      _playbackEndDebounce = Timer(const Duration(milliseconds: 180), () {
+      _playbackEndDebounce = Timer(const Duration(milliseconds: 80), () {
         _playbackEndDebounce = null;
         if (!mounted || gen != _liveAudioGeneration || !_awaitingLocalPlaybackEnd) {
           return;
         }
-        _awaitingLocalPlaybackEnd = false;
-        _playerStarted = false;
-        _micHoldForAssistantPcm = false;
-        _livePlaylist = null;
-        _playlistLoadedIntoPlayer = false;
-        _networkTurnComplete = false;
-        _playerStateSub?.cancel();
-        _playerStateSub = null;
-        ref
-            .read(liveSessionProvider.notifier)
-            .scheduleMicUnsuppressAfterLocalPlayback();
+        _cleanupAfterPlayback();
       });
     });
   }
 
-  void _stopAndClearAudio() {
-    _liveAudioGeneration++;
-    _wavQueueTail = Future.value();
-    _playbackEndDebounce?.cancel();
-    _playbackEndDebounce = null;
-    _awaitingLocalPlaybackEnd = false;
+  void _startMicSafetyTimer() {
+    _micSafetyTimer?.cancel();
+    _micSafetyTimer = Timer(_kMicSafetyTimeout, () {
+      _micSafetyTimer = null;
+      if (!mounted) return;
+      if (!_sawPlayerAudibleThisArm && _micHoldForAssistantPcm) {
+        debugPrint('[LiveAudio] mic safety timeout — force unsuppress');
+        _unsuppressMic();
+      }
+    });
+  }
+
+  void _cancelMicSafetyTimer() {
+    _micSafetyTimer?.cancel();
+    _micSafetyTimer = null;
+  }
+
+  void _unsuppressMic() {
     _micHoldForAssistantPcm = false;
+    if (mounted) {
+      ref.read(liveSessionProvider.notifier).setLivePlaybackSuppressMic(false);
+    }
+  }
+
+  void _cleanupAfterPlayback() {
+    _awaitingLocalPlaybackEnd = false;
+    _playerStarted = false;
+    _playlistLoadedIntoPlayer = false;
+    _micHoldForAssistantPcm = false;
+    _networkTurnComplete = false;
+    _playerDry = false;
+    _prerollBytes = 0;
+    _livePlaylist = null;
     _playerStateSub?.cancel();
     _playerStateSub = null;
     _playerCompleteSub?.cancel();
     _playerCompleteSub = null;
-    _pcmBuffer.clear();
-    _livePlaylist = null;
-    _prerollBytes = 0;
-    _playerStarted = false;
+    _cancelMicSafetyTimer();
+    // Stop the player so it fully releases the audio route — otherwise its
+    // lingering "playback" state can degrade mic quality / echo cancellation.
+    unawaited(_livePlayer.stop().catchError((_) {}));
+    ref
+        .read(liveSessionProvider.notifier)
+        .scheduleMicUnsuppressAfterLocalPlayback(
+          delay: const Duration(milliseconds: 150),
+        );
+  }
+
+  void _stopAndClearAudio() {
+    _liveAudioGeneration++;
+    _audioChainTail = Future.value();
+    _playbackEndDebounce?.cancel();
+    _playbackEndDebounce = null;
+    _awaitingLocalPlaybackEnd = false;
+    _micHoldForAssistantPcm = false;
     _networkTurnComplete = false;
+    _prerollBytes = 0;
+    _pcmBuffer.clear();
+    _playerStateSub?.cancel();
+    _playerStateSub = null;
+    _playerCompleteSub?.cancel();
+    _playerCompleteSub = null;
+    _livePlaylist = null;
+    _playerStarted = false;
     _playlistLoadedIntoPlayer = false;
-    for (final f in List.of(_tempFiles)) {
-      File(f).delete().ignore();
-    }
-    _tempFiles.clear();
+    _playerDry = false;
+    _cancelMicSafetyTimer();
     unawaited(_livePlayer.stop().catchError((_) {}));
     if (mounted) {
       ref.read(liveSessionProvider.notifier).setLivePlaybackSuppressMic(false);
@@ -463,7 +467,7 @@ class _LiveVoiceOverlayState extends ConsumerState<LiveVoiceOverlay>
   @override
   void dispose() {
     _liveAudioGeneration++;
-    _wavQueueTail = Future.value();
+    _audioChainTail = Future.value();
     _ring1Controller.dispose();
     _ring2Controller.dispose();
     _ring3Controller.dispose();
@@ -471,11 +475,43 @@ class _LiveVoiceOverlayState extends ConsumerState<LiveVoiceOverlay>
     _playbackEndDebounce?.cancel();
     _playerStateSub?.cancel();
     _playerCompleteSub?.cancel();
-    for (final f in _tempFiles) {
-      File(f).delete().ignore();
-    }
+    _cancelMicSafetyTimer();
     unawaited(_livePlayer.dispose().catchError((_) {}));
     super.dispose();
+  }
+
+  // --- WAV builder ---
+
+  static Uint8List _buildWav(Uint8List pcmData, {int sampleRate = 24000}) {
+    const channels = 1;
+    const bitsPerSample = 16;
+    final byteRate = sampleRate * channels * (bitsPerSample ~/ 8);
+    final blockAlign = channels * (bitsPerSample ~/ 8);
+    final dataSize = pcmData.length;
+
+    final wav = Uint8List(44 + dataSize);
+    final hdr = ByteData.sublistView(wav, 0, 44);
+
+    void s(int o, int v) => hdr.setUint8(o, v);
+    void u16(int o, int v) => hdr.setUint16(o, v, Endian.little);
+    void u32(int o, int v) => hdr.setUint32(o, v, Endian.little);
+
+    // RIFF
+    s(0, 0x52); s(1, 0x49); s(2, 0x46); s(3, 0x46);
+    u32(4, 36 + dataSize);
+    // WAVE
+    s(8, 0x57); s(9, 0x41); s(10, 0x56); s(11, 0x45);
+    // fmt
+    s(12, 0x66); s(13, 0x6D); s(14, 0x74); s(15, 0x20);
+    u32(16, 16); u16(20, 1); u16(22, channels);
+    u32(24, sampleRate); u32(28, byteRate); u16(32, blockAlign);
+    u16(34, bitsPerSample);
+    // data
+    s(36, 0x64); s(37, 0x61); s(38, 0x74); s(39, 0x61);
+    u32(40, dataSize);
+
+    wav.setRange(44, 44 + dataSize, pcmData);
+    return wav;
   }
 
   // --- UI ---
@@ -486,7 +522,6 @@ class _LiveVoiceOverlayState extends ConsumerState<LiveVoiceOverlay>
     final agent = ref.watch(activeAgentProvider);
     final topBarColor = theme.colorScheme.surface.withValues(alpha: 0.97);
 
-    // Only top chrome: chat list scrolls in the clear area below (with matching padding).
     return Positioned(
       top: 0,
       left: 0,
@@ -550,7 +585,6 @@ class _LiveVoiceOverlayState extends ConsumerState<LiveVoiceOverlay>
     );
   }
 
-  /// Compact row: small rings + status; fits in [_hudHeight] so it never overlaps bubbles.
   Widget _buildCompactHud(ThemeData theme, dynamic agent) {
     final agentEmoji =
         (agent != null && (agent.emoji as String).isNotEmpty) ? agent.emoji as String : '🎙';
@@ -701,29 +735,31 @@ class _LiveVoiceOverlayState extends ConsumerState<LiveVoiceOverlay>
       ],
     );
   }
+}
 
-  static Uint8List _buildWav(Uint8List pcm,
-      {int sampleRate = 24000, int channels = 1, int bitsPerSample = 16}) {
-    final byteRate = sampleRate * channels * (bitsPerSample ~/ 8);
-    final blockAlign = channels * (bitsPerSample ~/ 8);
-    final dataSize = pcm.length;
-    final header = ByteData(44);
-    void s(int o, int v) => header.setUint8(o, v);
-    void u16(int o, int v) => header.setUint16(o, v, Endian.little);
-    void u32(int o, int v) => header.setUint32(o, v, Endian.little);
-    s(0, 0x52); s(1, 0x49); s(2, 0x46); s(3, 0x46);
-    u32(4, 36 + dataSize);
-    s(8, 0x57); s(9, 0x41); s(10, 0x56); s(11, 0x45);
-    s(12, 0x66); s(13, 0x6D); s(14, 0x74); s(15, 0x20);
-    u32(16, 16); u16(20, 1); u16(22, channels);
-    u32(24, sampleRate); u32(28, byteRate); u16(32, blockAlign);
-    u16(34, bitsPerSample);
-    s(36, 0x64); s(37, 0x61); s(38, 0x74); s(39, 0x61);
-    u32(40, dataSize);
-    final wav = Uint8List(44 + dataSize);
-    wav.setRange(0, 44, header.buffer.asUint8List());
-    wav.setRange(44, 44 + dataSize, pcm);
-    return wav;
+// --- In-memory WAV segment source ---
+
+/// A [StreamAudioSource] that serves a complete in-memory WAV file.
+/// Returns the full byte payload on every [request] — no file I/O, no
+/// progressive streaming, just instant bytes.
+// ignore: experimental_member_use
+class _InMemoryWavSource extends StreamAudioSource {
+  final Uint8List _wav;
+  _InMemoryWavSource(this._wav);
+
+  @override
+  // ignore: experimental_member_use
+  Future<StreamAudioResponse> request([int? start, int? end]) async {
+    final effectiveStart = start ?? 0;
+    final effectiveEnd = end ?? _wav.length;
+    // ignore: experimental_member_use
+    return StreamAudioResponse(
+      sourceLength: _wav.length,
+      contentLength: effectiveEnd - effectiveStart,
+      offset: effectiveStart,
+      stream: Stream.value(_wav.sublist(effectiveStart, effectiveEnd)),
+      contentType: 'audio/wav',
+    );
   }
 }
 
