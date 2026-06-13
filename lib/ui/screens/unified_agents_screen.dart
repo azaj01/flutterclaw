@@ -1462,6 +1462,7 @@ class _UnifiedAgentsScreenState extends ConsumerState<UnifiedAgentsScreen> {
 
   void _showSkillInstall(BuildContext context, ClawHubSkill skill) {
     bool isInstalling = false;
+    String? installStep;
 
     showModalBottomSheet<void>(
       context: context,
@@ -1526,11 +1527,33 @@ class _UnifiedAgentsScreenState extends ConsumerState<UnifiedAgentsScreen> {
                   ),
                 ],
                 const SizedBox(height: 20),
+                if (isInstalling && installStep != null) ...[
+                  Row(
+                    children: [
+                      const SizedBox(
+                        height: 14,
+                        width: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        installStep!,
+                        style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 FilledButton(
                   onPressed: isInstalling
                       ? null
                       : () async {
-                          setSheetState(() => isInstalling = true);
+                          setSheetState(() {
+                            isInstalling = true;
+                            installStep = context.l10n.downloadingSkill;
+                          });
                           final skillsService = ref.read(skillsServiceProvider);
 
                           // Download content first for compatibility check
@@ -1544,6 +1567,8 @@ class _UnifiedAgentsScreenState extends ConsumerState<UnifiedAgentsScreen> {
                             }
                             return;
                           }
+
+                          if (ctx.mounted) setSheetState(() => installStep = context.l10n.checkingCompatibility);
 
                           // Check compatibility with mobile
                           final compat = await skillsService.checkSkillCompatibility(content);

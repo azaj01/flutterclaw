@@ -650,5 +650,9 @@
   "toolPoliciesOtherToolsNote": "Estes interruptores cobrem ferramentas sensíveis à privacidade. Outras são gerenciadas automaticamente ou via Ferramentas externas (MCP).",
   "useCustomIdHint": "Você pode usar o texto da pesquisa como ID de modelo personalizado",
   "useModelId": "Usar modelo",
-  "whatsappNotConnected": "Sem conexão — escaneie o QR para vincular"
+  "whatsappNotConnected": "Sem conexão — escaneie o QR para vincular",
+  "downloadingSkill": "Baixando habilidade...",
+  "@downloadingSkill": { "description": "Progress label while downloading skill from ClawHub" },
+  "checkingCompatibility": "Verificando compatibilidade...",
+  "@checkingCompatibility": { "description": "Progress label while running LLM compatibility check" }
 }

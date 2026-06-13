@@ -634,9 +634,13 @@ Respond with ONLY a JSON object (no markdown, no code fences):
         _log.info('ClawHub skill: ${map['slug']} - Fields: ${map.keys.join(", ")}');
         _log.info('ClawHub skill data: $map');
 
-        // Try multiple field names that the API might use
+        // Try multiple field names that the API might use.
+        // The API returns owner as a nested object: {"handle":"...", "displayName":"..."}
+        final ownerObj = map['owner'];
         final author = map['author'] as String? ??
-                      map['owner'] as String? ??
+                      map['ownerHandle'] as String? ??
+                      (ownerObj is Map ? ownerObj['handle'] as String? : null) ??
+                      (ownerObj is Map ? ownerObj['displayName'] as String? : null) ??
                       map['username'] as String?;
 
         // Parse numbers correctly - they might come as strings or ints

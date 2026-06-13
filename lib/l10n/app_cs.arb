@@ -650,5 +650,9 @@
   "toolPoliciesOtherToolsNote": "Tyto přepínače se týkají nástrojů citlivých na soukromí. Ostatní jsou spravovány automaticky nebo přes Externí nástroje (MCP).",
   "useCustomIdHint": "Můžete použít hledaný text jako vlastní ID modelu",
   "useModelId": "Použít model",
-  "whatsappNotConnected": "Nepřipojeno — naskenujte QR pro propojení"
+  "whatsappNotConnected": "Nepřipojeno — naskenujte QR pro propojení",
+  "downloadingSkill": "Stahování dovednosti...",
+  "@downloadingSkill": { "description": "Progress label while downloading skill from ClawHub" },
+  "checkingCompatibility": "Kontrola kompatibility...",
+  "@checkingCompatibility": { "description": "Progress label while running LLM compatibility check" }
 }

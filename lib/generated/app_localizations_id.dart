@@ -2243,4 +2243,10 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get testConnectionFirst => 'Uji koneksi sebelum menyimpan';
+
+  @override
+  String get downloadingSkill => 'Mengunduh skill...';
+
+  @override
+  String get checkingCompatibility => 'Memeriksa kompatibilitas...';
 }

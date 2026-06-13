@@ -2141,4 +2141,10 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get testConnectionFirst => '保存前先测试连接';
+
+  @override
+  String get downloadingSkill => '正在下载技能...';
+
+  @override
+  String get checkingCompatibility => '正在检查兼容性...';
 }

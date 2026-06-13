@@ -650,5 +650,9 @@
   "toolPoliciesOtherToolsNote": "Эти переключатели касаются инструментов, связанных с конфиденциальностью. Остальные управляются автоматически или через Внешние инструменты (MCP).",
   "useCustomIdHint": "Можно использовать текст поиска как пользовательский ID модели",
   "useModelId": "Использовать модель",
-  "whatsappNotConnected": "Не подключено — отсканируйте QR для связи"
+  "whatsappNotConnected": "Не подключено — отсканируйте QR для связи",
+  "downloadingSkill": "Завантаження навички...",
+  "@downloadingSkill": { "description": "Progress label while downloading skill from ClawHub" },
+  "checkingCompatibility": "Перевірка сумісності...",
+  "@checkingCompatibility": { "description": "Progress label while running LLM compatibility check" }
 }

@@ -2265,4 +2265,10 @@ class AppLocalizationsIt extends AppLocalizations {
 
   @override
   String get testConnectionFirst => 'Testa la connessione prima di salvare';
+
+  @override
+  String get downloadingSkill => 'Download skill in corso...';
+
+  @override
+  String get checkingCompatibility => 'Verifica compatibilità...';
 }

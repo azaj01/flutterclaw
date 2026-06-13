@@ -650,5 +650,9 @@
   "toolPoliciesOtherToolsNote": "Te przełączniki dotyczą narzędzi wrażliwych na prywatność. Inne są zarządzane automatycznie lub przez Narzędzia zewnętrzne (MCP).",
   "useCustomIdHint": "Możesz użyć tekstu wyszukiwania jako niestandardowego ID modelu",
   "useModelId": "Użyj modelu",
-  "whatsappNotConnected": "Brak połączenia — zeskanuj QR, aby połączyć"
+  "whatsappNotConnected": "Brak połączenia — zeskanuj QR, aby połączyć",
+  "downloadingSkill": "Pobieranie umiejętności...",
+  "@downloadingSkill": { "description": "Progress label while downloading skill from ClawHub" },
+  "checkingCompatibility": "Sprawdzanie zgodności...",
+  "@checkingCompatibility": { "description": "Progress label while running LLM compatibility check" }
 }

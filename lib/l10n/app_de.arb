@@ -650,5 +650,9 @@
   "toolPoliciesOtherToolsNote": "Diese Schalter betreffen datenschutzrelevante Tools. Andere werden automatisch oder über Externe Tools (MCP) verwaltet.",
   "useCustomIdHint": "Sie können den Suchtext als benutzerdefinierte Modell-ID verwenden",
   "useModelId": "Modell verwenden",
-  "whatsappNotConnected": "Nicht verbunden — QR scannen zum Verknüpfen"
+  "whatsappNotConnected": "Nicht verbunden — QR scannen zum Verknüpfen",
+  "downloadingSkill": "Skill wird heruntergeladen...",
+  "@downloadingSkill": { "description": "Progress label while downloading skill from ClawHub" },
+  "checkingCompatibility": "Kompatibilität wird geprüft...",
+  "@checkingCompatibility": { "description": "Progress label while running LLM compatibility check" }
 }

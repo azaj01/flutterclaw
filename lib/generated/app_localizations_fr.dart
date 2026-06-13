@@ -2274,4 +2274,10 @@ class AppLocalizationsFr extends AppLocalizations {
 
   @override
   String get testConnectionFirst => 'Testez la connexion avant d\'enregistrer';
+
+  @override
+  String get downloadingSkill => 'Téléchargement de la compétence...';
+
+  @override
+  String get checkingCompatibility => 'Vérification de la compatibilité...';
 }

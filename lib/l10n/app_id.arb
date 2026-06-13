@@ -650,5 +650,9 @@
   "toolPoliciesOtherToolsNote": "Tombol ini untuk alat sensitif privasi. Lainnya dikelola otomatis atau via Alat eksternal (MCP).",
   "useCustomIdHint": "Anda dapat menggunakan teks pencarian sebagai ID model kustom",
   "useModelId": "Gunakan model",
-  "whatsappNotConnected": "Tidak terhubung — pindai QR untuk menautkan"
+  "whatsappNotConnected": "Tidak terhubung — pindai QR untuk menautkan",
+  "downloadingSkill": "Mengunduh skill...",
+  "@downloadingSkill": { "description": "Progress label while downloading skill from ClawHub" },
+  "checkingCompatibility": "Memeriksa kompatibilitas...",
+  "@checkingCompatibility": { "description": "Progress label while running LLM compatibility check" }
 }

@@ -650,5 +650,9 @@
   "toolPoliciesOtherToolsNote": "สวิตช์เหล่านี้สำหรับเครื่องมือที่เกี่ยวกับความเป็นส่วนตัว อื่นๆ จัดการอัตโนมัติหรือผ่านเครื่องมือภายนอก (MCP)",
   "useCustomIdHint": "คุณสามารถใช้ข้อความค้นหาเป็น ID โมเดลที่กำหนดเอง",
   "useModelId": "ใช้โมเดล",
-  "whatsappNotConnected": "ไม่เชื่อมต่อ — สแกน QR เพื่อเชื่อม"
+  "whatsappNotConnected": "ไม่เชื่อมต่อ — สแกน QR เพื่อเชื่อม",
+  "downloadingSkill": "กำลังดาวน์โหลดทักษะ...",
+  "@downloadingSkill": { "description": "Progress label while downloading skill from ClawHub" },
+  "checkingCompatibility": "กำลังตรวจสอบความเข้ากัน...",
+  "@checkingCompatibility": { "description": "Progress label while running LLM compatibility check" }
 }

@@ -2258,4 +2258,10 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get testConnectionFirst => 'सहेजने से पहले कनेक्शन परीक्षण करें';
+
+  @override
+  String get downloadingSkill => 'कौशल डाउनलोड हो रहा है...';
+
+  @override
+  String get checkingCompatibility => 'संगतता जाँची जा रही है...';
 }

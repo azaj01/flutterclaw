@@ -2258,4 +2258,10 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get testConnectionFirst => 'Test de verbinding vóór opslaan';
+
+  @override
+  String get downloadingSkill => 'Skill downloaden...';
+
+  @override
+  String get checkingCompatibility => 'Compatibiliteit controleren...';
 }

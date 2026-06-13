@@ -650,5 +650,9 @@
   "toolPoliciesOtherToolsNote": "تغطي هذه المفاتيح الأدوات الحساسة للخصوصية. تُدار الأخرى تلقائيًا أو عبر الأدوات الخارجية (MCP).",
   "useCustomIdHint": "يمكنك استخدام نص البحث كمعرّف نموذج مخصص",
   "useModelId": "استخدام النموذج",
-  "whatsappNotConnected": "غير متصل — امسح QR للربط"
+  "whatsappNotConnected": "غير متصل — امسح QR للربط",
+  "downloadingSkill": "جارٍ تنزيل المهارة...",
+  "@downloadingSkill": { "description": "Progress label while downloading skill from ClawHub" },
+  "checkingCompatibility": "جارٍ التحقق من التوافق...",
+  "@checkingCompatibility": { "description": "Progress label while running LLM compatibility check" }
 }

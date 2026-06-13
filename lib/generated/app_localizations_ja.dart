@@ -2159,4 +2159,10 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get testConnectionFirst => '保存前に接続をテスト';
+
+  @override
+  String get downloadingSkill => 'スキルをダウンロード中...';
+
+  @override
+  String get checkingCompatibility => '互換性を確認中...';
 }

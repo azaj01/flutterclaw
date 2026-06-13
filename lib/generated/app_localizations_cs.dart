@@ -2255,4 +2255,10 @@ class AppLocalizationsCs extends AppLocalizations {
 
   @override
   String get testConnectionFirst => 'Před uložením otestujte připojení';
+
+  @override
+  String get downloadingSkill => 'Stahování dovednosti...';
+
+  @override
+  String get checkingCompatibility => 'Kontrola kompatibility...';
 }

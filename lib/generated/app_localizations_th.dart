@@ -2223,4 +2223,10 @@ class AppLocalizationsTh extends AppLocalizations {
 
   @override
   String get testConnectionFirst => 'ทดสอบการเชื่อมต่อก่อนบันทึก';
+
+  @override
+  String get downloadingSkill => 'กำลังดาวน์โหลดทักษะ...';
+
+  @override
+  String get checkingCompatibility => 'กำลังตรวจสอบความเข้ากัน...';
 }

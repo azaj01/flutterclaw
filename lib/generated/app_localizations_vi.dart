@@ -2231,4 +2231,10 @@ class AppLocalizationsVi extends AppLocalizations {
 
   @override
   String get testConnectionFirst => 'Kiểm tra kết nối trước khi lưu';
+
+  @override
+  String get downloadingSkill => 'Đang tải xuống kỹ năng...';
+
+  @override
+  String get checkingCompatibility => 'Đang kiểm tra tính tương thích...';
 }

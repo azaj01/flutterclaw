@@ -4045,6 +4045,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Test connection before saving'**
   String get testConnectionFirst;
+
+  /// Progress label while downloading skill from ClawHub
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading skill...'**
+  String get downloadingSkill;
+
+  /// Progress label while running LLM compatibility check
+  ///
+  /// In en, this message translates to:
+  /// **'Checking compatibility...'**
+  String get checkingCompatibility;
 }
 
 class _AppLocalizationsDelegate

@@ -650,5 +650,9 @@
   "toolPoliciesOtherToolsNote": "Các công tắc này dành cho công cụ nhạy cảm quyền riêng tư. Các công cụ khác được quản lý tự động hoặc qua Công cụ bên ngoài (MCP).",
   "useCustomIdHint": "Bạn có thể dùng văn bản tìm kiếm làm ID mô hình tùy chỉnh",
   "useModelId": "Dùng mô hình",
-  "whatsappNotConnected": "Chưa kết nối — quét QR để liên kết"
+  "whatsappNotConnected": "Chưa kết nối — quét QR để liên kết",
+  "downloadingSkill": "Đang tải xuống kỹ năng...",
+  "@downloadingSkill": { "description": "Progress label while downloading skill from ClawHub" },
+  "checkingCompatibility": "Đang kiểm tra tính tương thích...",
+  "@checkingCompatibility": { "description": "Progress label while running LLM compatibility check" }
 }

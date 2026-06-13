@@ -650,5 +650,9 @@
   "toolPoliciesOtherToolsNote": "これらのスイッチはプライバシー関連ツール用です。他は自動または外部ツール (MCP) で管理されます。",
   "useCustomIdHint": "検索テキストをカスタムモデルIDとして使用できます",
   "useModelId": "モデルを使用",
-  "whatsappNotConnected": "未接続 — QRをスキャンしてリンク"
+  "whatsappNotConnected": "未接続 — QRをスキャンしてリンク",
+  "downloadingSkill": "スキルをダウンロード中...",
+  "@downloadingSkill": { "description": "Progress label while downloading skill from ClawHub" },
+  "checkingCompatibility": "互換性を確認中...",
+  "@checkingCompatibility": { "description": "Progress label while running LLM compatibility check" }
 }

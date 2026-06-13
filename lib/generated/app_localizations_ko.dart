@@ -2159,4 +2159,10 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get testConnectionFirst => '저장 전 연결 테스트';
+
+  @override
+  String get downloadingSkill => '스킬 다운로드 중...';
+
+  @override
+  String get checkingCompatibility => '호환성 확인 중...';
 }

@@ -2263,4 +2263,10 @@ class AppLocalizationsUk extends AppLocalizations {
 
   @override
   String get testConnectionFirst => 'Перевірте підключення перед збереженням';
+
+  @override
+  String get downloadingSkill => 'Завантаження навички...';
+
+  @override
+  String get checkingCompatibility => 'Перевірка сумісності...';
 }

@@ -2256,4 +2256,10 @@ class AppLocalizationsPl extends AppLocalizations {
 
   @override
   String get testConnectionFirst => 'Przetestuj połączenie przed zapisaniem';
+
+  @override
+  String get downloadingSkill => 'Pobieranie umiejętności...';
+
+  @override
+  String get checkingCompatibility => 'Sprawdzanie zgodności...';
 }

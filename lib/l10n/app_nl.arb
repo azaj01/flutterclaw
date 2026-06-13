@@ -650,5 +650,9 @@
   "toolPoliciesOtherToolsNote": "Deze schakelaars gelden voor privacygevoelige tools. Andere worden automatisch of via Externe tools (MCP) beheerd.",
   "useCustomIdHint": "Je kunt de zoektekst als aangepaste model-ID gebruiken",
   "useModelId": "Model gebruiken",
-  "whatsappNotConnected": "Niet verbonden — scan QR om te koppelen"
+  "whatsappNotConnected": "Niet verbonden — scan QR om te koppelen",
+  "downloadingSkill": "Skill downloaden...",
+  "@downloadingSkill": { "description": "Progress label while downloading skill from ClawHub" },
+  "checkingCompatibility": "Compatibiliteit controleren...",
+  "@checkingCompatibility": { "description": "Progress label while running LLM compatibility check" }
 }

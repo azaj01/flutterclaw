@@ -2261,4 +2261,10 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get testConnectionFirst => 'Проверьте подключение перед сохранением';
+
+  @override
+  String get downloadingSkill => 'Загрузка навыка...';
+
+  @override
+  String get checkingCompatibility => 'Проверка совместимости...';
 }

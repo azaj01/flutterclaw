@@ -650,5 +650,9 @@
   "toolPoliciesOtherToolsNote": "这些开关适用于隐私相关工具。其他工具由系统自动管理或通过外部工具 (MCP) 管理。",
   "useCustomIdHint": "可将搜索文本用作自定义模型 ID",
   "useModelId": "使用模型",
-  "whatsappNotConnected": "未连接 — 扫描二维码绑定"
+  "whatsappNotConnected": "未连接 — 扫描二维码绑定",
+  "downloadingSkill": "正在下载技能...",
+  "@downloadingSkill": { "description": "Progress label while downloading skill from ClawHub" },
+  "checkingCompatibility": "正在检查兼容性...",
+  "@checkingCompatibility": { "description": "Progress label while running LLM compatibility check" }
 }

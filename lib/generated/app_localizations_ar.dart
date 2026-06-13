@@ -2241,4 +2241,10 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get testConnectionFirst => 'اختبر الاتصال قبل الحفظ';
+
+  @override
+  String get downloadingSkill => 'جارٍ تنزيل المهارة...';
+
+  @override
+  String get checkingCompatibility => 'جارٍ التحقق من التوافق...';
 }

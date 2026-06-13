@@ -2233,4 +2233,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get testConnectionFirst => 'Test connection before saving';
+
+  @override
+  String get downloadingSkill => 'Downloading skill...';
+
+  @override
+  String get checkingCompatibility => 'Checking compatibility...';
 }

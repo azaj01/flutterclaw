@@ -2934,5 +2934,9 @@
   "channelHealthIssue": "Connection issue — tap to fix",
   "@channelHealthIssue": { "description": "Health banner on channel tile" },
   "testConnectionFirst": "Test connection before saving",
-  "@testConnectionFirst": { "description": "Hint on add provider screen" }
+  "@testConnectionFirst": { "description": "Hint on add provider screen" },
+  "downloadingSkill": "Downloading skill...",
+  "@downloadingSkill": { "description": "Progress label while downloading skill from ClawHub" },
+  "checkingCompatibility": "Checking compatibility...",
+  "@checkingCompatibility": { "description": "Progress label while running LLM compatibility check" }
 }

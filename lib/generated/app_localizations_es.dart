@@ -2271,4 +2271,10 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get testConnectionFirst => 'Prueba la conexión antes de guardar';
+
+  @override
+  String get downloadingSkill => 'Descargando habilidad...';
+
+  @override
+  String get checkingCompatibility => 'Comprobando compatibilidad...';
 }

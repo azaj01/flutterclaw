@@ -650,5 +650,9 @@
   "toolPoliciesOtherToolsNote": "ये स्विच गोपनीयता-संवेदनशील टूल के लिए हैं। अन्य स्वचालित या बाहरी टूल (MCP) से प्रबंधित होते हैं।",
   "useCustomIdHint": "आप खोज पाठ को कस्टम मॉडल ID के रूप में उपयोग कर सकते हैं",
   "useModelId": "मॉडल उपयोग करें",
-  "whatsappNotConnected": "कनेक्ट नहीं — QR स्कैन करके लिंक करें"
+  "whatsappNotConnected": "कनेक्ट नहीं — QR स्कैन करके लिंक करें",
+  "downloadingSkill": "कौशल डाउनलोड हो रहा है...",
+  "@downloadingSkill": { "description": "Progress label while downloading skill from ClawHub" },
+  "checkingCompatibility": "संगतता जाँची जा रही है...",
+  "@checkingCompatibility": { "description": "Progress label while running LLM compatibility check" }
 }

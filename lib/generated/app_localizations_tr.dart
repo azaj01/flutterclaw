@@ -2257,4 +2257,10 @@ class AppLocalizationsTr extends AppLocalizations {
 
   @override
   String get testConnectionFirst => 'Kaydetmeden önce bağlantıyı test edin';
+
+  @override
+  String get downloadingSkill => 'Beceri indiriliyor...';
+
+  @override
+  String get checkingCompatibility => 'Uyumluluk kontrol ediliyor...';
 }

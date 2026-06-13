@@ -2265,4 +2265,10 @@ class AppLocalizationsPt extends AppLocalizations {
 
   @override
   String get testConnectionFirst => 'Teste a conexão antes de salvar';
+
+  @override
+  String get downloadingSkill => 'Baixando habilidade...';
+
+  @override
+  String get checkingCompatibility => 'Verificando compatibilidade...';
 }

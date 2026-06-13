@@ -650,5 +650,9 @@
   "toolPoliciesOtherToolsNote": "Bu anahtarlar gizlilikle ilgili araçlar içindir. Diğerleri otomatik veya Harici araçlar (MCP) ile yönetilir.",
   "useCustomIdHint": "Arama metnini özel model kimliği olarak kullanabilirsiniz",
   "useModelId": "Modeli kullan",
-  "whatsappNotConnected": "Bağlı değil — bağlamak için QR tarayın"
+  "whatsappNotConnected": "Bağlı değil — bağlamak için QR tarayın",
+  "downloadingSkill": "Beceri indiriliyor...",
+  "@downloadingSkill": { "description": "Progress label while downloading skill from ClawHub" },
+  "checkingCompatibility": "Uyumluluk kontrol ediliyor...",
+  "@checkingCompatibility": { "description": "Progress label while running LLM compatibility check" }
 }
