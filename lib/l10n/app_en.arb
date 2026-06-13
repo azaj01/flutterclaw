@@ -2539,10 +2539,10 @@
   "apiKeyTitle": "API Key",
   "@apiKeyTitle": { "description": "API Key section title" },
 
-  "slackConfigSaved": "Slack saved — restart the gateway to connect",
+  "slackConfigSaved": "Slack configuration saved",
   "@slackConfigSaved": { "description": "Slack config saved snackbar" },
 
-  "signalConfigSaved": "Signal saved — restart gateway to connect",
+  "signalConfigSaved": "Signal configuration saved",
   "@signalConfigSaved": { "description": "Signal config saved snackbar" },
 
   "idPrefix": "ID: {id}",
@@ -2702,5 +2702,161 @@
   "@whatsAppLinkedOnboarding": { "description": "Connected description in onboarding WhatsApp pairing card" },
 
   "cancelLink": "Cancel Link",
-  "@cancelLink": { "description": "Button to cancel WhatsApp linking" }
+  "@cancelLink": { "description": "Button to cancel WhatsApp linking" },
+
+  "searchModels": "Search models",
+  "@searchModels": { "description": "OpenRouter model search field label" },
+
+  "noModelsFound": "No models match your search",
+  "@noModelsFound": { "description": "Empty state when OpenRouter model search has no results" },
+
+  "useCustomIdHint": "You can use the search text as a custom model ID",
+  "@useCustomIdHint": { "description": "Hint below empty search results" },
+
+  "useModelId": "Use model",
+  "@useModelId": { "description": "Button to use custom model ID from search text" },
+
+  "modelsAvailable": "models available",
+  "@modelsAvailable": { "description": "Suffix for model count e.g. '356 models available'" },
+
+  "modelUnavailableTitle": "Model unavailable",
+  "@modelUnavailableTitle": { "description": "Banner title when a model is no longer available" },
+
+  "modelUnavailableMessage": "{model} is no longer available. Change your model in Settings.",
+  "@modelUnavailableMessage": { "description": "Banner message when model fails with not found", "placeholders": { "model": { "type": "String" } } },
+
+  "changeModel": "Change model",
+  "@changeModel": { "description": "Action button on model unavailable banner" },
+
+  "credentialLabel": "Label (optional)",
+  "@credentialLabel": { "description": "Label field for named credentials" },
+
+  "credentialLabelHint": "e.g. work, personal",
+  "@credentialLabelHint": { "description": "Hint for credential label field" },
+
+  "selectCredential": "Select API key",
+  "@selectCredential": { "description": "Dropdown label for choosing which credential to use" },
+
+  "tokenValidationFailed": "Validation failed: {error}",
+  "@tokenValidationFailed": { "description": "Shown when channel credential validation fails", "placeholders": { "error": { "type": "String" } } },
+
+  "saveAnyway": "Save anyway",
+  "@saveAnyway": { "description": "Button to save config despite failed validation" },
+
+  "channelDisconnected": "Channel disconnected",
+  "@channelDisconnected": { "description": "Snackbar after disconnecting a channel" },
+
+  "channelConnectFailed": "Saved, but the channel failed to connect: {error}",
+  "@channelConnectFailed": { "description": "Snackbar when channel config saved but adapter start failed", "placeholders": { "error": { "type": "String" } } },
+
+  "channelErrorLabel": "Error: {error}",
+  "@channelErrorLabel": { "description": "Channel list subtitle showing last connection error", "placeholders": { "error": { "type": "String" } } },
+
+  "newConversationTitle": "Start new conversation?",
+  "@newConversationTitle": { "description": "Dialog title for new conversation confirmation" },
+
+  "newConversationMessage": "This will end the current session and start a fresh one. The previous transcript is kept on disk.",
+  "@newConversationMessage": { "description": "Dialog body for new conversation confirmation" },
+
+  "startNewConversation": "Start new",
+  "@startNewConversation": { "description": "Confirm button for new conversation dialog" },
+
+  "retryingRequest": "Retrying...",
+  "@retryingRequest": { "description": "Status shown while a failed LLM request is retried" },
+
+  "contextCompacted": "Conversation compacted to free up context",
+  "@contextCompacted": { "description": "Snackbar/notice when auto-compaction ran" },
+
+  "compactionFailed": "Could not compact this conversation",
+  "@compactionFailed": { "description": "Snackbar when manual compaction fails (e.g. not enough history)" },
+
+  "allowedUsersTitle": "Allowed users",
+  "@allowedUsersTitle": { "description": "Channel allowlist section title" },
+
+  "allowlistEmptyWarning": "Allowlist is empty — anyone who messages this bot can talk to the agent.",
+  "@allowlistEmptyWarning": { "description": "Warning shown when a channel allowlist is empty (open access)" },
+
+  "allowFromAddHint": "User ID or phone number",
+  "@allowFromAddHint": { "description": "Hint for the allowlist add field" },
+
+  "llmErrorPayloadTooLarge": "The request is too large for the provider (HTTP 413, \"Payload Too Large\"). This usually happens with very long history, images or base64 attachments. Try a new conversation, send fewer attachments or shorten the context.",
+  "@llmErrorPayloadTooLarge": { "description": "LLM error: HTTP 413" },
+
+  "llmErrorPayloadTooLargeTitle": "Request too large",
+  "@llmErrorPayloadTooLargeTitle": { "description": "LLM error title: HTTP 413" },
+
+  "llmErrorViewDocs": "View error documentation",
+  "@llmErrorViewDocs": { "description": "CTA label for provider error docs" },
+
+  "llmErrorOpenRouterPrivacy": "OpenRouter has no endpoints available for this model under your account's data and privacy policy. Open https://openrouter.ai/settings/privacy in a browser (sign in), review which providers and data types you allow, save the changes and try again. You can also pick another model.",
+  "@llmErrorOpenRouterPrivacy": { "description": "LLM error: OpenRouter data policy" },
+
+  "llmErrorOpenRouterPrivacyTitle": "Data policy (OpenRouter)",
+  "@llmErrorOpenRouterPrivacyTitle": { "description": "LLM error title: OpenRouter data policy" },
+
+  "llmErrorOpenPrivacySettings": "Open privacy settings",
+  "@llmErrorOpenPrivacySettings": { "description": "CTA label for OpenRouter privacy settings" },
+
+  "llmError401": "The API key is invalid or missing. Check your configuration in Settings > Providers and models.",
+  "@llmError401": { "description": "LLM error: HTTP 401" },
+
+  "llmError402": "Your account has insufficient balance or requires a paid plan to use this model. Check your plan on the provider's site.",
+  "@llmError402": { "description": "LLM error: HTTP 402" },
+
+  "llmError403": "You don't have permission to access this model. You may need to enable it in your provider account.",
+  "@llmError403": { "description": "LLM error: HTTP 403" },
+
+  "llmError404": "The requested model was not found. Verify the model name is correct in Settings.",
+  "@llmError404": { "description": "LLM error: HTTP 404" },
+
+  "llmError413": "The request exceeds the maximum allowed size (HTTP 413). Reduce the history, attachments or images in the message.",
+  "@llmError413": { "description": "LLM error: HTTP 413 short" },
+
+  "llmError429": "Too many requests. The provider has temporarily limited your access. Wait a moment and try again.",
+  "@llmError429": { "description": "LLM error: HTTP 429" },
+
+  "llmError500": "The provider's server had an internal error. Try again in a few minutes.",
+  "@llmError500": { "description": "LLM error: HTTP 500" },
+
+  "llmError503": "The provider's service is unavailable right now. Try again in a few minutes.",
+  "@llmError503": { "description": "LLM error: HTTP 502/503" },
+
+  "llmError529": "The provider is overloaded. Try again in a few minutes.",
+  "@llmError529": { "description": "LLM error: HTTP 529" },
+
+  "llmError400": "The provider rejected the request (400): {raw}",
+  "@llmError400": {
+    "description": "LLM error: HTTP 400",
+    "placeholders": { "raw": { "type": "String" } }
+  },
+
+  "llmErrorNetwork": "Could not connect to the provider. Check your internet connection.",
+  "@llmErrorNetwork": { "description": "LLM error: network failure" },
+
+  "llmErrorTimeout": "The request took too long and timed out. Try again.",
+  "@llmErrorTimeout": { "description": "LLM error: timeout" },
+
+  "llmErrorWithStatus": "The provider responded with an error ({statusCode}): {raw}",
+  "@llmErrorWithStatus": {
+    "description": "LLM error: generic with status code",
+    "placeholders": {
+      "statusCode": { "type": "int" },
+      "raw": { "type": "String" }
+    }
+  },
+
+  "llmErrorUnknown": "An error occurred while communicating with the provider. Try again.",
+  "@llmErrorUnknown": { "description": "LLM error: unknown" },
+
+  "discoverModels": "Discover models",
+  "@discoverModels": { "description": "Button to fetch available models from the provider API" },
+
+  "refreshModels": "Refresh model list",
+  "@refreshModels": { "description": "Tooltip for refreshing cached model list" },
+
+  "modelNotInProviderList": "This model was not found in the provider's model list. It may still work if the ID is correct.",
+  "@modelNotInProviderList": { "description": "Warning when added model ID is not in the discovered list" },
+
+  "validating": "Validating...",
+  "@validating": { "description": "Progress label while validating credentials" }
 }

@@ -7,8 +7,10 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutterclaw/core/agent/agent_loop.dart';
+import 'package:flutterclaw/core/agent/message_queue.dart';
 import 'package:flutterclaw/core/agent/provider_router.dart';
 import 'package:flutterclaw/core/agent/session_manager.dart';
+import 'package:flutterclaw/core/agent/subagent_registry.dart';
 import 'package:flutterclaw/core/gateway/gateway_server.dart';
 import 'package:flutterclaw/data/models/config.dart';
 import 'package:flutterclaw/services/ios_background_audio_service.dart';
@@ -94,11 +96,31 @@ class IosGatewayService {
       );
       _log.info('AgentLoop created');
 
+      final messageQueue = MessageQueue(
+        onRun: (message) => agentLoop.processMessage(
+          message.sessionKey,
+          message.text,
+          channelType: message.channelType,
+          chatId: message.chatId,
+          contentBlocks: message.contentBlocks,
+          channelContext: message.channelContext,
+          onIntermediateMessage: message.onIntermediateMessage,
+        ),
+      );
+      SubagentLoopProxy.instance.bind((sessionKey, task) async {
+        final response = await messageQueue.enqueueText(
+          sessionKey: sessionKey,
+          text: task,
+        );
+        return response.content;
+      });
+
       // Create and start gateway
       _log.info('Creating GatewayServer...');
       final gateway = GatewayServer(
         configManager: configManager,
         agentLoop: agentLoop,
+        messageQueue: messageQueue,
         sessionManager: sessionManager,
         toolRegistry: toolRegistry,
       );
@@ -288,9 +310,28 @@ class IosGatewayService {
           return _skillsService!.getSkillsPrompt();
         },
       );
+      final messageQueue = MessageQueue(
+        onRun: (message) => agentLoop.processMessage(
+          message.sessionKey,
+          message.text,
+          channelType: message.channelType,
+          chatId: message.chatId,
+          contentBlocks: message.contentBlocks,
+          channelContext: message.channelContext,
+          onIntermediateMessage: message.onIntermediateMessage,
+        ),
+      );
+      SubagentLoopProxy.instance.bind((sessionKey, task) async {
+        final response = await messageQueue.enqueueText(
+          sessionKey: sessionKey,
+          text: task,
+        );
+        return response.content;
+      });
       final gateway = GatewayServer(
         configManager: _configManager!,
         agentLoop: agentLoop,
+        messageQueue: messageQueue,
         sessionManager: _sessionManager!,
         toolRegistry: _toolRegistry!,
       );

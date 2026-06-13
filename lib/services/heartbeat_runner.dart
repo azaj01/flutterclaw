@@ -7,7 +7,7 @@ library;
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutterclaw/core/agent/agent_loop.dart';
+import 'package:flutterclaw/core/agent/message_queue.dart';
 import 'package:flutterclaw/data/models/config.dart';
 import 'package:logging/logging.dart';
 
@@ -15,14 +15,14 @@ final _log = Logger('flutterclaw.heartbeat');
 
 class HeartbeatRunner {
   final ConfigManager configManager;
-  final AgentLoop agentLoop;
+  final MessageQueue messageQueue;
 
   Timer? _timer;
   bool _running = false;
 
   HeartbeatRunner({
     required this.configManager,
-    required this.agentLoop,
+    required this.messageQueue,
   });
 
   bool get isRunning => _running;
@@ -75,9 +75,9 @@ class HeartbeatRunner {
 
       _log.info('Heartbeat firing with ${meaningful.length} chars of tasks');
 
-      await agentLoop.processMessage(
-        'heartbeat:main',
-        'Heartbeat: Read and execute the tasks in HEARTBEAT.md.\n\n$meaningful',
+      await messageQueue.enqueueText(
+        sessionKey: 'heartbeat:main',
+        text: 'Heartbeat: Read and execute the tasks in HEARTBEAT.md.\n\n$meaningful',
         channelType: 'system',
         chatId: 'heartbeat',
       );

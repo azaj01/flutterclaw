@@ -43,6 +43,7 @@ class TelegramChannelAdapter implements ChannelAdapter {
 
   MessageHandler? _handler;
   bool _running = false;
+  bool _apiReachable = false;
   int _lastUpdateId = 0;
   int _backoffSeconds = 1;
   final Map<String, Timer> _typingTimers = {};
@@ -58,7 +59,7 @@ class TelegramChannelAdapter implements ChannelAdapter {
   String get type => _type;
 
   @override
-  bool get isConnected => _running;
+  bool get isConnected => _running && _apiReachable;
 
   @override
   Future<void> start(MessageHandler handler) async {
@@ -70,6 +71,15 @@ class TelegramChannelAdapter implements ChannelAdapter {
     _running = true;
     _backoffSeconds = 1;
 
+    // Quick non-blocking API check so isConnected reflects reality without
+    // waiting for the first (long-poll) getUpdates round-trip.
+    unawaited(() async {
+      try {
+        await _dio.get('/getMe');
+        _apiReachable = true;
+      } catch (_) {}
+    }());
+
     await _registerCommands();
     unawaited(_pollLoop());
   }
@@ -77,6 +87,7 @@ class TelegramChannelAdapter implements ChannelAdapter {
   @override
   Future<void> stop() async {
     _running = false;
+    _apiReachable = false;
     _handler = null;
     for (final timer in _typingTimers.values) {
       timer.cancel();
@@ -166,11 +177,11 @@ class TelegramChannelAdapter implements ChannelAdapter {
     while (_running && _handler != null) {
       try {
         final updates = await _getUpdates();
+        _apiReachable = true;
         _backoffSeconds = 1;
 
         for (final u in updates) {
           final updateId = u['update_id'] as int;
-          if (updateId > _lastUpdateId) _lastUpdateId = updateId;
 
           final message = u['message'] as Map<String, dynamic>?;
           if (message == null) continue;
@@ -244,9 +255,21 @@ class TelegramChannelAdapter implements ChannelAdapter {
           // fetching new updates. Per-chat ordering is preserved via _chatQueues
           // so messages within the same chat are still handled sequentially.
           final incomingMsgId = message['message_id'] as int?;
-          _enqueueHandler(chatIdStr, incoming, incomingMsgId);
+          _enqueueHandler(chatIdStr, incoming, incomingMsgId, updateId);
         }
+      } on DioException catch (e, st) {
+        _apiReachable = false;
+        if (e.response?.statusCode == 429) {
+          final retryAfter = _parseRetryAfter(e.response?.data);
+          _log.warning('Telegram rate limited, waiting ${retryAfter}s');
+          await Future<void>.delayed(Duration(seconds: retryAfter));
+          continue;
+        }
+        _log.warning('Telegram poll error, reconnecting in $_backoffSeconds s', e, st);
+        await Future<void>.delayed(Duration(seconds: _backoffSeconds));
+        _backoffSeconds = min(_backoffSeconds * 2, _maxBackoffSeconds);
       } catch (e, st) {
+        _apiReachable = false;
         _log.warning('Telegram poll error, reconnecting in $_backoffSeconds s', e, st);
         await Future<void>.delayed(Duration(seconds: _backoffSeconds));
         _backoffSeconds = min(_backoffSeconds * 2, _maxBackoffSeconds);
@@ -260,6 +283,7 @@ class TelegramChannelAdapter implements ChannelAdapter {
     String chatId,
     IncomingMessage incoming,
     int? incomingMsgId,
+    int updateId,
   ) {
     final previous = _chatQueues[chatId] ?? Future<void>.value();
     _chatQueues[chatId] = previous.then((_) async {
@@ -269,6 +293,7 @@ class TelegramChannelAdapter implements ChannelAdapter {
       }
       try {
         await _handler!(incoming);
+        if (updateId > _lastUpdateId) _lastUpdateId = updateId;
         if (incomingMsgId != null) {
           await _setReaction(chatId, incomingMsgId, '✅');
         }
@@ -445,6 +470,16 @@ class TelegramChannelAdapter implements ChannelAdapter {
     if (data == null) return [];
     final list = data['result'] as List<dynamic>?;
     return list?.cast<Map<String, dynamic>>() ?? [];
+  }
+
+  int _parseRetryAfter(dynamic responseData) {
+    if (responseData is Map<String, dynamic>) {
+      final params = responseData['parameters'] as Map<String, dynamic>?;
+      final retry = params?['retry_after'];
+      if (retry is int && retry > 0) return retry;
+      if (retry is num) return retry.ceil();
+    }
+    return _backoffSeconds.clamp(1, _maxBackoffSeconds);
   }
 
   @override

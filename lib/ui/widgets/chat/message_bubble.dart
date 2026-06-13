@@ -1139,27 +1139,36 @@ class _MessageBubbleState extends ConsumerState<MessageBubble> {
                       height: 1.4,
                     ),
                   ),
-                  if (widget.message.errorCtaUrl != null &&
-                      widget.message.errorCtaUrl!.isNotEmpty) ...[
-                    const SizedBox(height: 12),
-                    Align(
-                      alignment: Alignment.centerLeft,
-                      child: FilledButton.tonal(
-                        onPressed: () async {
-                          final uri = Uri.tryParse(widget.message.errorCtaUrl!);
-                          if (uri != null && await canLaunchUrl(uri)) {
-                            await launchUrl(
-                              uri,
-                              mode: LaunchMode.externalApplication,
-                            );
-                          }
-                        },
-                        child: Text(
-                          widget.message.errorCtaLabel ?? 'Abrir enlace',
-                        ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      FilledButton.tonalIcon(
+                        onPressed: () =>
+                            ref.read(chatProvider.notifier).retryLastTurn(),
+                        icon: const Icon(Icons.refresh, size: 16),
+                        label: Text(context.l10n.retry),
                       ),
-                    ),
-                  ],
+                      if (widget.message.errorCtaUrl != null &&
+                          widget.message.errorCtaUrl!.isNotEmpty)
+                        FilledButton.tonal(
+                          onPressed: () async {
+                            final uri =
+                                Uri.tryParse(widget.message.errorCtaUrl!);
+                            if (uri != null && await canLaunchUrl(uri)) {
+                              await launchUrl(
+                                uri,
+                                mode: LaunchMode.externalApplication,
+                              );
+                            }
+                          },
+                          child: Text(
+                            widget.message.errorCtaLabel ?? 'Abrir enlace',
+                          ),
+                        ),
+                    ],
+                  ),
                 ],
               ),
             ),

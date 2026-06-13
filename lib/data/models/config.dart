@@ -6,8 +6,10 @@ import 'package:path_provider/path_provider.dart';
 import 'package:flutterclaw/data/models/agent_profile.dart';
 import 'package:flutterclaw/data/models/mcp_server_config.dart';
 import 'package:flutterclaw/data/models/model_catalog.dart';
+import 'package:flutterclaw/core/utils/atomic_file.dart';
 import 'package:flutterclaw/services/email_service.dart';
 import 'package:flutterclaw/services/oauth_service.dart';
+import 'package:uuid/uuid.dart';
 
 /// Stores authentication credentials for a provider (API key + optional base URL).
 /// Credentials are stored at the provider level so all models from the same
@@ -21,12 +23,16 @@ class ProviderCredential {
   /// Bedrock auth mode: 'bearer' (token) or 'sigv4' (access key + secret).
   final String? awsAuthMode;
 
+  /// Optional user-facing label (e.g. "work", "personal") for multi-key setups.
+  final String? label;
+
   const ProviderCredential({
     required this.apiKey,
     this.apiBase,
     this.awsSecretKey,
     this.awsRegion,
     this.awsAuthMode,
+    this.label,
   });
 
   factory ProviderCredential.fromJson(Map<String, dynamic> json) =>
@@ -36,6 +42,7 @@ class ProviderCredential {
         awsSecretKey: json['aws_secret_key'] as String?,
         awsRegion: json['aws_region'] as String?,
         awsAuthMode: json['aws_auth_mode'] as String?,
+        label: json['label'] as String?,
       );
 
   Map<String, dynamic> toJson() => {
@@ -44,6 +51,7 @@ class ProviderCredential {
     if (awsSecretKey != null) 'aws_secret_key': awsSecretKey,
     if (awsRegion != null) 'aws_region': awsRegion,
     if (awsAuthMode != null) 'aws_auth_mode': awsAuthMode,
+    if (label != null) 'label': label,
   };
 }
 
@@ -61,6 +69,10 @@ class ModelEntry {
   /// null means unknown — treated as text-only.
   final List<String>? input;
 
+  /// References a specific credential key in providerCredentials map
+  /// (e.g. "openrouter:work"). Falls back to base provider key if null.
+  final String? credentialId;
+
   const ModelEntry({
     required this.modelName,
     required this.model,
@@ -70,6 +82,7 @@ class ModelEntry {
     this.provider = 'openai',
     this.isFree = false,
     this.input,
+    this.credentialId,
   });
 
   bool get supportsVision => input?.contains('image') ?? false;
@@ -99,6 +112,7 @@ class ModelEntry {
     provider: json['provider'] as String? ?? 'openai',
     isFree: json['is_free'] as bool? ?? false,
     input: (json['input'] as List<dynamic>?)?.cast<String>(),
+    credentialId: json['credential_id'] as String?,
   );
 
   Map<String, dynamic> toJson() => {
@@ -110,6 +124,7 @@ class ModelEntry {
     'provider': provider,
     'is_free': isFree,
     if (input != null) 'input': input,
+    if (credentialId != null) 'credential_id': credentialId,
   };
 }
 
@@ -466,6 +481,20 @@ class ChannelsConfig {
     'slack': slack.toJson(),
     'signal': signal.toJson(),
   };
+
+  ChannelsConfig copyWith({
+    TelegramConfig? telegram,
+    DiscordConfig? discord,
+    WhatsAppConfig? whatsapp,
+    SlackConfig? slack,
+    SignalConfig? signal,
+  }) => ChannelsConfig(
+    telegram: telegram ?? this.telegram,
+    discord: discord ?? this.discord,
+    whatsapp: whatsapp ?? this.whatsapp,
+    slack: slack ?? this.slack,
+    signal: signal ?? this.signal,
+  );
 }
 
 class WebSearchProviderConfig {
@@ -752,19 +781,33 @@ class FlutterClawConfig {
 
   /// Returns true if the given provider has valid credentials stored.
   bool isProviderAuthenticated(String providerId) {
-    final cred = providerCredentials[providerId];
+    // Check exact key first, then any suffixed keys (e.g. "openrouter:work").
+    final cred = providerCredentials[providerId] ??
+        credentialsForProvider(providerId).values.firstOrNull;
     if (cred == null) return false;
-    if (providerId == 'bedrock') {
+    final baseId = providerId.split(':').first;
+    if (baseId == 'bedrock') {
       if (cred.awsAuthMode == 'bearer') {
-        // Bearer: just need the token and region.
         return cred.apiKey.isNotEmpty && (cred.awsRegion?.isNotEmpty ?? false);
       }
-      // SigV4: need access key, secret, and region.
       return cred.apiKey.isNotEmpty &&
           (cred.awsSecretKey?.isNotEmpty ?? false) &&
           (cred.awsRegion?.isNotEmpty ?? false);
     }
     return cred.apiKey.isNotEmpty;
+  }
+
+  /// Returns all credential entries whose key matches [baseProviderId] or
+  /// starts with "$baseProviderId:" (suffixed keys for multi-key setups).
+  Map<String, ProviderCredential> credentialsForProvider(String baseProviderId) {
+    final result = <String, ProviderCredential>{};
+    for (final entry in providerCredentials.entries) {
+      if (entry.key == baseProviderId ||
+          entry.key.startsWith('$baseProviderId:')) {
+        result[entry.key] = entry.value;
+      }
+    }
+    return result;
   }
 
   /// Returns a new config with the given provider credential saved (or replaced).
@@ -917,6 +960,24 @@ class ConfigManager {
   /// Optional secrets resolver. When set, [resolveApiKeyAsync] supports
   /// `{"$ref": "secrets/..."}` and `{"$ref": "env:..."}` references.
   Future<String?> Function(String ref)? secretsResolver;
+
+  /// Optional secrets writer. When set, [save] externalizes plaintext
+  /// provider API keys to secure storage and persists `$ref` placeholders
+  /// in config.json instead of the raw keys.
+  Future<void> Function(String name, String value)? secretsWriter;
+
+  /// Called after each successful [save] so live services can sync policies.
+  static final _saveListeners = <Future<void> Function()>[];
+
+  static void addSaveListener(Future<void> Function() listener) {
+    _saveListeners.add(listener);
+  }
+
+  /// Same pattern as provider API keys — resolved at load time.
+  static bool isSecretRef(String? value) =>
+      value != null && value.startsWith(r'{"$ref"');
+
+  static String secretRef(String name) => '{"\$ref":"secrets/$name"}';
 
   ConfigManager([this._config = const FlutterClawConfig()]);
 
@@ -1161,24 +1222,160 @@ After this introduction, this file will be automatically deleted.
   Future<void> load() async {
     final path = await configPath;
     final file = File(path);
+    var plaintextKeysOnDisk = false;
+    var migrated = false;
     if (await file.exists()) {
-      final content = await file.readAsString();
-      final json = jsonDecode(content) as Map<String, dynamic>;
-      _config = FlutterClawConfig.fromJson(json);
-      debugPrint(
-        '[ConfigManager] Loaded config: ${_config.modelList.length} models, ${_config.agentProfiles.length} agents',
-      );
+      Map<String, dynamic>? json;
+      try {
+        json = await readJsonWithBackup(path);
+      } catch (e) {
+        debugPrint('[ConfigManager] Failed to load config: $e');
+        rethrow;
+      }
+      if (json != null) {
+        _config = FlutterClawConfig.fromJson(json);
+        plaintextKeysOnDisk = _hasPlaintextProviderKeys(json) ||
+            _hasPlaintextChannelSecrets(json);
+        debugPrint(
+          '[ConfigManager] Loaded config: ${_config.modelList.length} models, ${_config.agentProfiles.length} agents',
+        );
+      }
     }
     // Run migrations after loading
     await _migrateToMultiAgent();
-    _migrateApiKeysToProviderCredentials();
-    _migrateOpenRouterDiscoveryModelIds();
-    _migrateLiveModelsOutOfPrimarySlot();
+    if (_migrateApiKeysToProviderCredentials()) migrated = true;
+    if (_migrateOpenRouterDiscoveryModelIds()) migrated = true;
+    if (_migrateLiveModelsOutOfPrimarySlot()) migrated = true;
+    if (_migrateSandboxExecToolName()) migrated = true;
+    // Resolve $ref secrets into memory, then rewrite config.json so any
+    // plaintext keys move into the platform keychain.
+    await _resolveProviderKeyRefs();
+    await _resolveChannelAndGatewaySecrets();
+    if ((plaintextKeysOnDisk || migrated) && secretsWriter != null) {
+      await save();
+      debugPrint('[ConfigManager] Migrated secrets to secure store');
+    }
     // IDENTITY.md is the authoritative source — sync name/emoji into AgentProfile
     await syncAgentIdentitiesFromWorkspace();
     debugPrint(
       '[ConfigManager] After migration: ${_config.agentProfiles.length} agents, activeAgent=${_config.activeAgent?.name}',
     );
+  }
+
+  /// Ensures the gateway has an auth token. Generates and persists one if missing.
+  Future<void> ensureGatewayToken() async {
+    if (_config.gateway.token.isNotEmpty) return;
+    const uuid = Uuid();
+    final token = uuid.v4();
+    if (secretsWriter != null) {
+      await secretsWriter!('gateway_token', token);
+      _config = _config.copyWith(
+        gateway: GatewayConfig(
+          host: _config.gateway.host,
+          port: _config.gateway.port,
+          autoStart: _config.gateway.autoStart,
+          token: secretRef('gateway_token'),
+          webhookEnabled: _config.gateway.webhookEnabled,
+          webhookDefaultSessionKey: _config.gateway.webhookDefaultSessionKey,
+        ),
+      );
+    } else {
+      _config = _config.copyWith(
+        gateway: GatewayConfig(
+          host: _config.gateway.host,
+          port: _config.gateway.port,
+          autoStart: _config.gateway.autoStart,
+          token: token,
+          webhookEnabled: _config.gateway.webhookEnabled,
+          webhookDefaultSessionKey: _config.gateway.webhookDefaultSessionKey,
+        ),
+      );
+    }
+    await save();
+    await _resolveChannelAndGatewaySecrets();
+    debugPrint('[ConfigManager] Generated gateway token');
+  }
+
+  /// True when the raw config JSON still stores at least one provider API key
+  /// in plaintext (i.e. not as a `$ref` placeholder).
+  static bool _hasPlaintextProviderKeys(Map<String, dynamic> json) {
+    final creds = json['provider_credentials'] as Map<String, dynamic>?;
+    if (creds == null) return false;
+    for (final value in creds.values) {
+      final cred = value as Map<String, dynamic>;
+      final key = cred['api_key'] as String? ?? '';
+      if (key.isNotEmpty && !isSecretRef(key)) return true;
+      final aws = cred['aws_secret_key'] as String? ?? '';
+      if (aws.isNotEmpty && !isSecretRef(aws)) return true;
+    }
+    return false;
+  }
+
+  /// Secure-store secret name for a provider credential id.
+  static String providerSecretName(String credentialId) =>
+      'provider_cred_$credentialId';
+
+  /// Replaces `$ref` API keys in [_config] with their resolved plaintext so
+  /// synchronous consumers (provider router, agent loop, settings UI) keep
+  /// working. The on-disk config keeps only the `$ref` placeholders.
+  Future<void> _resolveProviderKeyRefs() async {
+    if (secretsResolver == null || _config.providerCredentials.isEmpty) return;
+    final updated = <String, ProviderCredential>{};
+    var changed = false;
+    for (final entry in _config.providerCredentials.entries) {
+      final cred = entry.value;
+      if (cred.apiKey.startsWith(r'{"$ref"')) {
+        String resolved = '';
+        try {
+          resolved = await secretsResolver!(cred.apiKey) ?? '';
+        } catch (e) {
+          debugPrint('[ConfigManager] Failed to resolve key for ${entry.key}: $e');
+        }
+        updated[entry.key] = ProviderCredential(
+          apiKey: resolved,
+          apiBase: cred.apiBase,
+          awsSecretKey: cred.awsSecretKey,
+          awsRegion: cred.awsRegion,
+          awsAuthMode: cred.awsAuthMode,
+          label: cred.label,
+        );
+        changed = true;
+      } else {
+        updated[entry.key] = cred;
+      }
+    }
+    if (changed) {
+      _config = _config.copyWith(providerCredentials: updated);
+    }
+  }
+
+  /// Moves plaintext provider API keys from the serialized config into the
+  /// secure store, leaving `{"$ref": "secrets/..."}` placeholders behind.
+  Future<void> _externalizeProviderKeys(Map<String, dynamic> json) async {
+    if (secretsWriter == null) return;
+    final creds = json['provider_credentials'] as Map<String, dynamic>?;
+    if (creds == null) return;
+    for (final entry in creds.entries) {
+      final cred = entry.value as Map<String, dynamic>;
+      final key = cred['api_key'] as String? ?? '';
+      if (key.isEmpty || key.startsWith(r'{"$ref"')) continue;
+      final name = providerSecretName(entry.key);
+      try {
+        await secretsWriter!(name, key);
+        cred['api_key'] = secretRef(name);
+        final awsSecret = cred['aws_secret_key'] as String?;
+        if (awsSecret != null &&
+            awsSecret.isNotEmpty &&
+            !isSecretRef(awsSecret)) {
+          final awsName = '${name}_aws_secret';
+          await secretsWriter!(awsName, awsSecret);
+          cred['aws_secret_key'] = secretRef(awsName);
+        }
+      } catch (e) {
+        // Keep the plaintext key on failure rather than losing it.
+        debugPrint('[ConfigManager] Failed to externalize key for ${entry.key}: $e');
+      }
+    }
   }
 
   /// Reads each agent's IDENTITY.md and updates AgentProfile.name/emoji to match.
@@ -1252,9 +1449,9 @@ After this introduction, this file will be automatically deleted.
 
   /// Migrates per-model apiKeys to provider-level credentials for existing configs.
   /// This is a one-time migration that runs on load when providerCredentials is empty.
-  void _migrateApiKeysToProviderCredentials() {
-    if (_config.providerCredentials.isNotEmpty) return;
-    if (_config.modelList.isEmpty) return;
+  bool _migrateApiKeysToProviderCredentials() {
+    if (_config.providerCredentials.isNotEmpty) return false;
+    if (_config.modelList.isEmpty) return false;
 
     final migrated = <String, ProviderCredential>{};
     for (final model in _config.modelList) {
@@ -1271,13 +1468,15 @@ After this introduction, this file will be automatically deleted.
       debugPrint(
         '[ConfigManager] Migrated ${migrated.length} provider credentials from per-model keys',
       );
+      return true;
     }
+    return false;
   }
 
   /// Fixes model ids like `openrouter/minimax/minimax-m2.5:free` produced by an
   /// older discovery implementation. OpenRouter expects `minimax/minimax-m2.5:free`.
   /// Slugs with only two segments (e.g. `openrouter/auto`) stay as-is.
-  void _migrateOpenRouterDiscoveryModelIds() {
+  bool _migrateOpenRouterDiscoveryModelIds() {
     String? stripErroneousOpenRouterPrefix(String model) {
       if (!model.startsWith('openrouter/')) return null;
       final segments = model.split('/');
@@ -1310,12 +1509,14 @@ After this introduction, this file will be automatically deleted.
       debugPrint(
         '[ConfigManager] Migrated OpenRouter discovery model ids (stripped erroneous openrouter/ prefix)',
       );
+      return true;
     }
+    return false;
   }
 
   /// Ensures defaults and agent profiles never point at Live-only models for REST;
   /// drops unreferenced Live-only rows from [modelList].
-  void _migrateLiveModelsOutOfPrimarySlot() {
+  bool _migrateLiveModelsOutOfPrimarySlot() {
     String? firstChatModelForProvider(String provider) {
       for (final m in _config.modelList) {
         if (m.provider == provider && !m.isLiveOnly) return m.modelName;
@@ -1388,19 +1589,200 @@ After this introduction, this file will be automatically deleted.
       debugPrint(
         '[ConfigManager] Migrated Live-only models out of primary agent slots',
       );
+      return true;
+    }
+    return false;
+  }
+
+  /// The tool policies screen used to persist the legacy name `sandbox_exec`,
+  /// but the registered tool is `run_shell_command`, so the policy never
+  /// applied. Rewrite old entries to the real tool name.
+  bool _migrateSandboxExecToolName() {
+    final disabled = _config.tools.disabled;
+    if (!disabled.contains('sandbox_exec')) return false;
+    final updated = disabled
+        .map((t) => t == 'sandbox_exec' ? 'run_shell_command' : t)
+        .toSet()
+        .toList();
+    _config = _config.copyWith(
+      tools: ToolsConfig(
+        web: _config.tools.web,
+        browser: _config.tools.browser,
+        disabled: updated,
+      ),
+    );
+    debugPrint('[ConfigManager] Migrated sandbox_exec → run_shell_command in disabled tools');
+    return true;
+  }
+
+  static bool _hasPlaintextChannelSecrets(Map<String, dynamic> json) {
+    bool isPlain(String? v) =>
+        v != null && v.isNotEmpty && !isSecretRef(v);
+
+    if (isPlain((json['gateway'] as Map<String, dynamic>?)?['token'] as String?)) {
+      return true;
+    }
+    final channels = json['channels'] as Map<String, dynamic>?;
+    if (channels == null) return false;
+    for (final key in ['telegram', 'discord']) {
+      final token =
+          (channels[key] as Map<String, dynamic>?)?['token'] as String?;
+      if (isPlain(token)) return true;
+    }
+    final slack = channels['slack'] as Map<String, dynamic>?;
+    if (isPlain(slack?['bot_token'] as String?) ||
+        isPlain(slack?['app_token'] as String?)) {
+      return true;
+    }
+    return false;
+  }
+
+  Future<String?> _resolveSecretValue(String? value) async {
+    if (value == null || value.isEmpty || !isSecretRef(value)) return value;
+    if (secretsResolver == null) return '';
+    try {
+      return await secretsResolver!(value);
+    } catch (e) {
+      debugPrint('[ConfigManager] Failed to resolve secret ref: $e');
+      return '';
+    }
+  }
+
+  Future<void> _resolveChannelAndGatewaySecrets() async {
+    if (secretsResolver == null) return;
+
+    final gw = _config.gateway;
+    final gwToken = await _resolveSecretValue(gw.token);
+    if (gwToken != gw.token) {
+      _config = _config.copyWith(
+        gateway: GatewayConfig(
+          host: gw.host,
+          port: gw.port,
+          autoStart: gw.autoStart,
+          token: gwToken ?? '',
+          webhookEnabled: gw.webhookEnabled,
+          webhookDefaultSessionKey: gw.webhookDefaultSessionKey,
+        ),
+      );
+    }
+
+    final ch = _config.channels;
+    final telegramToken = await _resolveSecretValue(ch.telegram.token);
+    final discordToken = await _resolveSecretValue(ch.discord.token);
+    final slackBot = await _resolveSecretValue(ch.slack.botToken);
+    final slackApp = await _resolveSecretValue(ch.slack.appToken);
+
+    if (telegramToken != ch.telegram.token ||
+        discordToken != ch.discord.token ||
+        slackBot != ch.slack.botToken ||
+        slackApp != ch.slack.appToken) {
+      _config = _config.copyWith(
+        channels: ch.copyWith(
+          telegram: TelegramConfig(
+            enabled: ch.telegram.enabled,
+            token: telegramToken,
+            allowFrom: ch.telegram.allowFrom,
+            dmPolicy: ch.telegram.dmPolicy,
+          ),
+          discord: DiscordConfig(
+            enabled: ch.discord.enabled,
+            token: discordToken,
+            allowFrom: ch.discord.allowFrom,
+            dmPolicy: ch.discord.dmPolicy,
+          ),
+          slack: SlackConfig(
+            enabled: ch.slack.enabled,
+            botToken: slackBot,
+            appToken: slackApp,
+            allowFrom: ch.slack.allowFrom,
+          ),
+        ),
+      );
+    }
+
+    // Resolve AWS secret keys in provider credentials.
+    if (_config.providerCredentials.isEmpty) return;
+    final updatedCreds = <String, ProviderCredential>{};
+    var credsChanged = false;
+    for (final entry in _config.providerCredentials.entries) {
+      final cred = entry.value;
+      if (cred.awsSecretKey != null && isSecretRef(cred.awsSecretKey)) {
+        final resolved = await _resolveSecretValue(cred.awsSecretKey);
+        updatedCreds[entry.key] = ProviderCredential(
+          apiKey: cred.apiKey,
+          apiBase: cred.apiBase,
+          awsSecretKey: resolved,
+          awsRegion: cred.awsRegion,
+          awsAuthMode: cred.awsAuthMode,
+          label: cred.label,
+        );
+        credsChanged = true;
+      } else {
+        updatedCreds[entry.key] = cred;
+      }
+    }
+    if (credsChanged) {
+      _config = _config.copyWith(providerCredentials: updatedCreds);
+    }
+  }
+
+  Future<void> _externalizeSecretField(
+    Map<String, dynamic> parent,
+    String field,
+    String secretName,
+  ) async {
+    if (secretsWriter == null) return;
+    final value = parent[field] as String?;
+    if (value == null || value.isEmpty || isSecretRef(value)) return;
+    try {
+      await secretsWriter!(secretName, value);
+      parent[field] = secretRef(secretName);
+    } catch (e) {
+      debugPrint('[ConfigManager] Failed to externalize $secretName: $e');
+    }
+  }
+
+  Future<void> _externalizeChannelAndGatewaySecrets(
+    Map<String, dynamic> json,
+  ) async {
+    if (secretsWriter == null) return;
+
+    final gateway = json['gateway'] as Map<String, dynamic>?;
+    if (gateway != null) {
+      await _externalizeSecretField(gateway, 'token', 'gateway_token');
+    }
+
+    final channels = json['channels'] as Map<String, dynamic>?;
+    if (channels == null) return;
+
+    final telegram = channels['telegram'] as Map<String, dynamic>?;
+    if (telegram != null) {
+      await _externalizeSecretField(telegram, 'token', 'channel_telegram_token');
+    }
+    final discord = channels['discord'] as Map<String, dynamic>?;
+    if (discord != null) {
+      await _externalizeSecretField(discord, 'token', 'channel_discord_token');
+    }
+    final slack = channels['slack'] as Map<String, dynamic>?;
+    if (slack != null) {
+      await _externalizeSecretField(slack, 'bot_token', 'channel_slack_bot_token');
+      await _externalizeSecretField(slack, 'app_token', 'channel_slack_app_token');
     }
   }
 
   Future<void> save() async {
     final path = await configPath;
-    final file = File(path);
-    await file.parent.create(recursive: true);
     final encoder = const JsonEncoder.withIndent('  ');
     final json = _config.toJson();
+    await _externalizeProviderKeys(json);
+    await _externalizeChannelAndGatewaySecrets(json);
     debugPrint(
       '[ConfigManager] Saving config: modelList=${_config.modelList.length}, agents.defaults.modelName=${_config.agents.defaults.modelName}',
     );
-    await file.writeAsString(encoder.convert(json));
+    await writeAtomic(path, encoder.convert(json));
+    for (final listener in _saveListeners) {
+      await listener();
+    }
   }
 
   void update(FlutterClawConfig config) {

@@ -36,6 +36,7 @@ FlutterClaw is currently in **early alpha**. This release is experimental: you m
 - [Tools](#tools)
 - [Security](#security)
 - [Contact](#contact)
+- [Star History](#star-history)
 - [License](#license)
 
 ---
@@ -358,6 +359,18 @@ Do not commit `.env` files, `google-services.json`, `GoogleService-Info.plist`, 
 ## Contact
 
 [contact@flutterclaw.ai](mailto:contact@flutterclaw.ai)
+
+---
+
+## Star History
+
+<a href="https://www.star-history.com/?repos=flutterclaw%2Fflutterclaw&type=date&legend=bottom-right">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=flutterclaw/flutterclaw&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=flutterclaw/flutterclaw&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=flutterclaw/flutterclaw&type=date&legend=top-left" />
+ </picture>
+</a>
 
 ---
 

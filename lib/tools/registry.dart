@@ -264,7 +264,14 @@ class ToolRegistry {
 
     ToolResult result;
     try {
-      result = await tool.execute(args);
+      result = await tool
+          .execute(args)
+          .timeout(
+            const Duration(minutes: 3),
+            onTimeout: () => ToolResult.error(
+              'Tool "$name" timed out after 180 seconds',
+            ),
+          );
     } catch (e, st) {
       _log.severe('Tool "$name" threw during execute', e, st);
       return ToolResult.error('Tool "$name" failed: $e');
@@ -354,11 +361,21 @@ class ToolRegistry {
           }
           result = ToolResult.success(resultContent);
         } else {
-          result = await tool.execute(args);
+          result = await tool.execute(args).timeout(
+            const Duration(minutes: 3),
+            onTimeout: () => ToolResult.error(
+              'Tool "$name" timed out after 180 seconds',
+            ),
+          );
         }
       } else {
         // Non-streaming fallback
-        result = await tool.execute(args);
+        result = await tool.execute(args).timeout(
+          const Duration(minutes: 3),
+          onTimeout: () => ToolResult.error(
+            'Tool "$name" timed out after 180 seconds',
+          ),
+        );
       }
     } catch (e, st) {
       _log.severe('Tool "$name" threw during executeWithProgress', e, st);

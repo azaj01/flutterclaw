@@ -13,6 +13,7 @@ import 'dart:io';
 
 import 'package:flutterclaw/core/agent/session_disk_budget.dart';
 import 'package:flutterclaw/core/providers/provider_interface.dart';
+import 'package:flutterclaw/core/utils/atomic_file.dart';
 import 'package:flutterclaw/data/models/config.dart';
 import 'package:logging/logging.dart';
 import 'package:path/path.dart' as p;
@@ -20,6 +21,20 @@ import 'package:uuid/uuid.dart';
 
 final _log = Logger('flutterclaw.session_manager');
 const _uuid = Uuid();
+
+/// Simple async mutex — serializes operations per session key.
+class _AsyncLock {
+  Future<void> _chain = Future.value();
+
+  Future<T> run<T>(Future<T> Function() action) {
+    final completer = Completer<void>();
+    final prev = _chain;
+    _chain = completer.future;
+    return prev.then((_) => action()).whenComplete(() {
+      if (!completer.isCompleted) completer.complete();
+    });
+  }
+}
 
 /// Sessions with no activity in this window are considered inactive and
 /// excluded from list views / tool responses. Matches the spirit of
@@ -230,8 +245,9 @@ class SessionManager {
   final ConfigManager configManager;
   final Map<String, SessionMeta> _meta = {};
   final Map<String, List<LlmMessage>> _contextCache = {};
+  final Map<String, String?> _lastEntryIdBySession = {};
+  final Map<String, _AsyncLock> _sessionLocks = {};
   String? _sessionsDir;
-  String? _lastEntryId;
   final _diskBudget = const SessionDiskBudget();
   int _messagesSinceLastBudgetCheck = 0;
   static const int _kBudgetCheckInterval = 20; // check every 20 messages
@@ -315,6 +331,11 @@ class SessionManager {
 
   /// Append a message to the session transcript (JSONL).
   Future<void> addMessage(String key, LlmMessage message) async {
+    final lock = _sessionLocks.putIfAbsent(key, () => _AsyncLock());
+    await lock.run(() => _addMessageUnlocked(key, message));
+  }
+
+  Future<void> _addMessageUnlocked(String key, LlmMessage message) async {
     final meta = _meta[key];
     if (meta == null) return;
 
@@ -323,7 +344,7 @@ class SessionManager {
     final entry = TranscriptEntry(
       type: 'message',
       id: entryId,
-      parentId: _lastEntryId,
+      parentId: _lastEntryIdBySession[key],
       data: {
         'role': message.role,
         'content': message.content,
@@ -335,7 +356,7 @@ class SessionManager {
     );
 
     await _appendToTranscript(dir, meta.sessionId, entry);
-    _lastEntryId = entryId;
+    _lastEntryIdBySession[key] = entryId;
 
     meta.messageCount++;
     meta.lastActivity = DateTime.now();
@@ -450,6 +471,11 @@ class SessionManager {
     return List.from(messages ?? []);
   }
 
+  /// Replace in-memory context after emergency truncation.
+  void replaceContextCache(String key, List<LlmMessage> messages) {
+    _contextCache[key] = List.from(messages);
+  }
+
   /// Get message history (legacy compatibility).
   List<LlmMessage> getHistory(String key, {int? limit}) {
     final msgs = _contextCache[key] ?? [];
@@ -497,16 +523,10 @@ class SessionManager {
     await _appendToTranscript(dir, newId, header);
 
     _contextCache[key] = [];
-    _lastEntryId = null;
+    _lastEntryIdBySession.remove(key);
     await _saveStore(dir);
     _sessionsChangedController.add(null);
     _log.info('Reset session $key (new transcript: $newId)');
-  }
-
-  /// Compact session: will be called from AgentLoop with LLM summary.
-  Future<void> compact(String key) async {
-    // Placeholder -- actual LLM compaction is triggered from AgentLoop
-    _log.info('Compact requested for $key (use AgentLoop.compactSession)');
   }
 
   /// Returns the metadata for a session key, or null if not found.
@@ -958,6 +978,14 @@ class SessionManager {
     _repairOrphanedToolUses(messages);
 
     _contextCache[key] = messages;
+
+    // Track last entry id for parent chain on subsequent appends.
+    for (final e in entries.reversed) {
+      if (e.type == 'message') {
+        _lastEntryIdBySession[key] = e.id;
+        break;
+      }
+    }
   }
 
   /// Scan [messages] for assistant tool_use blocks that lack a corresponding
@@ -1017,7 +1045,7 @@ class SessionManager {
       map[entry.key] = entry.value.toJson();
     }
     final encoder = const JsonEncoder.withIndent('  ');
-    await File(storePath).writeAsString(encoder.convert(map));
+    await writeAtomic(storePath, encoder.convert(map));
   }
 
   // -- Inter-Agent Communication --------------------------------------------

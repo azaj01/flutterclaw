@@ -128,6 +128,25 @@ class AgentLoop {
   // Cached device info for system prompt injection
   Map<String, dynamic>? _deviceInfo;
 
+  final _compactionCtl = StreamController<String>.broadcast();
+
+  /// Emits the session key whenever auto-compaction ran successfully, so the
+  /// UI can inform the user that older context was summarised.
+  Stream<String> get compactionEvents => _compactionCtl.stream;
+
+  /// Session keys with a pending cancellation request for the in-flight run.
+  final Set<String> _cancelRequested = {};
+
+  /// Request cancellation of the in-flight run for [sessionKey].
+  ///
+  /// The loop checks this flag before each LLM call and before each tool
+  /// execution, aborting the run and persisting stub tool results so the
+  /// transcript never ends with orphaned tool calls.
+  void requestCancel(String sessionKey) => _cancelRequested.add(sessionKey);
+
+  bool _isCancelRequested(String sessionKey) =>
+      _cancelRequested.contains(sessionKey);
+
   /// Build the Android UI automation guidance section, including device-specific
   /// navigation tips based on the actual hardware and Android version.
   Future<String> _buildUiAutomationGuidance() async {
@@ -399,6 +418,7 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
     Map<String, dynamic>? channelContext,
     Future<void> Function(String text)? onIntermediateMessage,
   }) async {
+    _cancelRequested.remove(sessionKey); // clear any stale request
     await hookRunner?.runLifecycle(HookEvent.sessionStart, sessionKey);
     await sessionManager.getOrCreate(sessionKey, channelType, chatId);
     final session = sessionManager.getSession(sessionKey);
@@ -490,6 +510,7 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
         final compacted = await compactSession(sessionKey);
         if (compacted != null) {
           _log.info('Compaction successful: $compacted');
+          _compactionCtl.add(sessionKey);
           // Reload context after compaction
           context = sessionManager.getContextMessages(sessionKey);
           // Rebuild messages list with new context
@@ -512,6 +533,7 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
           'applying emergency truncation',
         );
         _truncateOldestToolResults(context, contextWindow);
+        sessionManager.replaceContextCache(sessionKey, context);
 
         // Rebuild messages with truncated context
         messages.clear();
@@ -552,6 +574,17 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
       var maxIter = maxToolIterations;
 
       while (maxIter-- > 0) {
+        if (_isCancelRequested(sessionKey)) {
+          _cancelRequested.remove(sessionKey);
+          _log.info('Run cancelled for $sessionKey before LLM call');
+          return AgentResponse(
+            content: '',
+            toolCallsExecuted: toolCallsExecuted,
+            usage: totalUsage,
+            sessionKey: sessionKey,
+          );
+        }
+
         final request = LlmRequest(
           model: modelEntry.model,
           apiKey: configManager.config.resolveApiKey(modelEntry),
@@ -642,14 +675,20 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
               // Inject session context so tools that need to reach back to the user
               // (e.g. web_browse request_user_action) know which channel to use.
               args['__session_key'] = sessionKey;
-              _log.info('Tool start: ${tc.function.name} (onToolStatus=${onToolStatus != null})');
-              onToolStatus?.call(tc.function.name, args, isDone: false);
               ToolResult result;
-              try {
-                result = await toolRegistry.execute(tc.function.name, args);
-              } catch (e, st) {
-                _log.severe('Tool ${tc.function.name} threw unexpectedly', e, st);
-                result = ToolResult.error('Tool "${tc.function.name}" crashed: $e');
+              if (_isCancelRequested(sessionKey)) {
+                // Skip execution but still persist a stub tool result so the
+                // transcript never ends with orphaned tool calls.
+                result = ToolResult.error('(cancelled by user)');
+              } else {
+                _log.info('Tool start: ${tc.function.name} (onToolStatus=${onToolStatus != null})');
+                onToolStatus?.call(tc.function.name, args, isDone: false);
+                try {
+                  result = await toolRegistry.execute(tc.function.name, args);
+                } catch (e, st) {
+                  _log.severe('Tool ${tc.function.name} threw unexpectedly', e, st);
+                  result = ToolResult.error('Tool "${tc.function.name}" crashed: $e');
+                }
               }
               onToolStatus?.call(tc.function.name, args, isDone: true);
               toolCallsExecuted++;
@@ -802,6 +841,7 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
     String? userLanguage,
     Map<String, dynamic>? channelContext,
   }) async* {
+    _cancelRequested.remove(sessionKey); // clear any stale request
     await sessionManager.getOrCreate(sessionKey, channelType, chatId);
     final session = sessionManager.getSession(sessionKey);
     // Use the agent that owns this session so its identity/workspace is loaded
@@ -957,6 +997,7 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
         final compacted = await compactSession(sessionKey);
         if (compacted != null) {
           _log.info('Compaction successful: $compacted');
+          _compactionCtl.add(sessionKey);
           // Reload context after compaction
           context = sessionManager.getContextMessages(sessionKey);
           // Rebuild messages list with new context
@@ -979,6 +1020,7 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
           'applying emergency truncation',
         );
         _truncateOldestToolResults(context, contextWindow);
+        sessionManager.replaceContextCache(sessionKey, context);
 
         // Rebuild messages with truncated context
         messages.clear();
@@ -1020,6 +1062,21 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
       var maxIter = maxToolIterations;
 
       while (maxIter-- > 0) {
+        if (_isCancelRequested(sessionKey)) {
+          _cancelRequested.remove(sessionKey);
+          _log.info('Streaming run cancelled for $sessionKey before LLM call');
+          yield AgentStreamEvent(
+            isDone: true,
+            finalResponse: AgentResponse(
+              content: contentBuffer,
+              toolCallsExecuted: toolCallsExecuted,
+              usage: totalUsage,
+              sessionKey: sessionKey,
+            ),
+          );
+          return;
+        }
+
         contentBuffer = '';
         final request = LlmRequest(
           model: modelEntry.model,
@@ -1044,6 +1101,19 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
           await for (final event in providerRouter.chatCompletionStream(
             request,
           )) {
+            if (_isCancelRequested(sessionKey)) {
+              _cancelRequested.remove(sessionKey);
+              yield AgentStreamEvent(
+                isDone: true,
+                finalResponse: AgentResponse(
+                  content: contentBuffer,
+                  toolCallsExecuted: toolCallsExecuted,
+                  usage: totalUsage,
+                  sessionKey: sessionKey,
+                ),
+              );
+              return;
+            }
             if (event.contentDelta != null) {
               contentBuffer += event.contentDelta!;
               yield AgentStreamEvent(textDelta: event.contentDelta);
@@ -1117,10 +1187,26 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
           await sessionManager.addMessage(sessionKey, assistantMsg);
           loopMessages.add(assistantMsg);
 
+          // Track tool calls whose result has not been persisted yet. If the
+          // run is cancelled mid-loop (UI cancels the stream subscription,
+          // which terminates this generator at the next yield), the finally
+          // block persists stub results so the transcript never ends with
+          // orphaned tool calls.
+          final pendingToolIds = <String, String>{
+            for (final tc in toolCallsBuffer) tc.id: tc.function.name,
+          };
+
+          try {
           for (final tc in toolCallsBuffer) {
             try {
               final args = _parseToolArgs(tc.function.arguments);
               args['__session_key'] = sessionKey;
+
+              ToolResult result;
+              if (_isCancelRequested(sessionKey)) {
+                // Skip execution but still persist a stub tool result.
+                result = ToolResult.error('(cancelled by user)');
+              } else {
               onToolStatus?.call(tc.function.name, args, isDone: false);
               yield AgentStreamEvent(toolName: tc.function.name, toolArgs: args);
 
@@ -1129,7 +1215,6 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
               final StreamController<AgentStreamEvent> chunkCtrl =
                   StreamController<AgentStreamEvent>();
 
-              ToolResult result;
               try {
                 final chunkFuture = toolRegistry.executeWithProgress(
                   tc.function.name,
@@ -1163,12 +1248,10 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
 
               onToolStatus?.call(tc.function.name, args, isDone: true);
               toolCallsExecuted++;
-              yield AgentStreamEvent(
-                toolResult: result.content,
-                toolDetails: result.details,
-              );
+              }
 
-              // Persist tool result
+              // Persist tool result BEFORE yielding so a cancellation at the
+              // yield point cannot leave the transcript without this result.
               final toolMsg = LlmMessage(
                 role: 'tool',
                 content: result.content,
@@ -1177,6 +1260,12 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
               );
               await sessionManager.addMessage(sessionKey, toolMsg);
               loopMessages.add(toolMsg);
+              pendingToolIds.remove(tc.id);
+
+              yield AgentStreamEvent(
+                toolResult: result.content,
+                toolDetails: result.details,
+              );
             } catch (e, st) {
               _log.severe(
                 'Outer streaming tool-call handling failed for ${tc.function.name}',
@@ -1191,10 +1280,31 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
               );
               try {
                 await sessionManager.addMessage(sessionKey, errorMsg);
+                pendingToolIds.remove(tc.id);
               } catch (persistErr) {
                 _log.severe('Failed to persist error tool_result', persistErr);
               }
               loopMessages.add(errorMsg);
+            }
+          }
+          } finally {
+            // Persist stub results for any tool calls that never completed
+            // (run cancelled or generator terminated mid-loop).
+            for (final entry in pendingToolIds.entries) {
+              try {
+                await sessionManager.addMessage(
+                  sessionKey,
+                  LlmMessage(
+                    role: 'tool',
+                    content: '(cancelled by user)',
+                    toolCallId: entry.key,
+                    name: entry.value,
+                  ),
+                );
+              } catch (persistErr) {
+                _log.severe(
+                    'Failed to persist cancelled tool_result', persistErr);
+              }
             }
           }
           continue;
@@ -1393,13 +1503,12 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
     }
 
     // Keep the last ~6 messages, summarize everything before.
-    // Adjust the boundary so we never split a tool-call group: if the first
-    // kept message is a tool result, walk backwards to include its parent
-    // assistant message (with tool_calls) so the pair stays intact.
+    // Re-read context after memory flush may have appended messages.
+    final freshContext = sessionManager.getContextMessages(sessionKey);
     var keepRecent = 6;
-    while (keepRecent < context.length) {
-      final firstKeptIdx = context.length - keepRecent;
-      final firstKept = context[firstKeptIdx];
+    while (keepRecent < freshContext.length) {
+      final firstKeptIdx = freshContext.length - keepRecent;
+      final firstKept = freshContext[firstKeptIdx];
       if (firstKept.role == 'tool' ||
           (firstKept.role == 'assistant' &&
               firstKept.toolCalls != null &&
@@ -1409,8 +1518,6 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
         break;
       }
     }
-    // Re-read context: the memory flush (PR #18) may have appended messages.
-    final freshContext = sessionManager.getContextMessages(sessionKey);
     final toSummarize = freshContext.sublist(0, freshContext.length - keepRecent);
 
     if (toSummarize.isEmpty) return null;
@@ -1466,16 +1573,19 @@ If you have exhausted ALL approaches above (minimum 8-10 different attempts) and
         return null;
       }
 
-      // Find the entry ID of the first kept message from the transcript
+      // Find the entry ID of the first kept message aligned with context cache.
       final transcript = await sessionManager.loadTranscript(sessionKey);
       final messageEntries = transcript
           .where((e) => e.type == 'message')
           .toList();
-      final keptStartIndex = messageEntries.length - keepRecent;
+      final effectiveEntries = messageEntries.length > freshContext.length
+          ? messageEntries.sublist(messageEntries.length - freshContext.length)
+          : messageEntries;
+      final keptStartIndex = effectiveEntries.length - keepRecent;
       final firstKeptId =
-          keptStartIndex >= 0 && keptStartIndex < messageEntries.length
-              ? messageEntries[keptStartIndex].id
-              : messageEntries.last.id;
+          keptStartIndex >= 0 && keptStartIndex < effectiveEntries.length
+              ? effectiveEntries[keptStartIndex].id
+              : effectiveEntries.last.id;
 
       final tokensBefore = toSummarize.fold<int>(
         0,

@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutterclaw/core/agent/agent_loop.dart';
+import 'package:flutterclaw/core/agent/message_queue.dart';
 import 'package:flutterclaw/core/agent/session_manager.dart';
 import 'package:flutterclaw/core/gateway/protocol.dart';
 import 'package:flutterclaw/data/models/config.dart';
@@ -35,6 +36,7 @@ class _Client {
 class GatewayServer {
   final ConfigManager configManager;
   final AgentLoop agentLoop;
+  final MessageQueue messageQueue;
   final SessionManager sessionManager;
   final ToolRegistry toolRegistry;
   final CronService? cronService;
@@ -47,6 +49,7 @@ class GatewayServer {
   GatewayServer({
     required this.configManager,
     required this.agentLoop,
+    required this.messageQueue,
     required this.sessionManager,
     required this.toolRegistry,
     this.cronService,
@@ -59,8 +62,10 @@ class GatewayServer {
       return;
     }
 
+    await configManager.ensureGatewayToken();
+
     final config = configManager.config.gateway;
-    final host = config.host;
+    final host = _validatedHost(config.host, config.token);
     final port = config.port;
 
     final wsHandler = webSocketHandler(_onConnection);
@@ -107,6 +112,17 @@ class GatewayServer {
     _log.info('Gateway server stopped');
   }
 
+  /// Rejects binding to non-loopback addresses without a configured token.
+  String _validatedHost(String host, String token) {
+    const loopback = {'127.0.0.1', 'localhost', '::1'};
+    if (!loopback.contains(host.toLowerCase()) && token.isEmpty) {
+      throw Exception(
+        'Non-loopback gateway host "$host" requires a gateway token',
+      );
+    }
+    return host;
+  }
+
   /// Inbound HTTP automation hook (Zapier, n8n, curl, …). Accepts JSON, returns 202
   /// immediately; execution continues in the background on the agent loop.
   Future<Response> _handleWebhook(Request request) async {
@@ -117,16 +133,19 @@ class GatewayServer {
 
     if (gw.token.isNotEmpty) {
       final auth = request.headers['authorization'] ?? '';
-      final q = request.requestedUri.queryParameters['token'] ?? '';
-      final bearerOk = auth == 'Bearer ${gw.token}';
-      final queryOk = q == gw.token;
-      if (!bearerOk && !queryOk) {
+      if (auth != 'Bearer ${gw.token}') {
         return Response(
           401,
           body: jsonEncode(const {'ok': false, 'error': 'unauthorized'}),
           headers: {'content-type': 'application/json'},
         );
       }
+    } else {
+      return Response(
+        401,
+        body: jsonEncode(const {'ok': false, 'error': 'webhook_token_required'}),
+        headers: {'content-type': 'application/json'},
+      );
     }
 
     final bodyStr = await request.readAsString();
@@ -165,9 +184,9 @@ class GatewayServer {
 
     unawaited(() async {
       try {
-        await agentLoop.processMessage(
-          sessionKey,
-          text,
+        await messageQueue.enqueueText(
+          sessionKey: sessionKey,
+          text: text,
           channelType: channelType,
           chatId: chatId,
         );
@@ -264,8 +283,20 @@ class GatewayServer {
     final method = req.method!;
     final params = req.params ?? {};
 
+    // All methods except connect require prior authentication.
+    if (method != 'connect' && !client.connected) {
+      _sendResponse(
+        client,
+        id,
+        false,
+        null,
+        error: {'message': 'Unauthorized: call connect first'},
+      );
+      return;
+    }
+
     try {
-      final payload = await handleMethod(method, params);
+      final payload = await handleMethod(method, params, client: client);
       _sendResponse(client, id, true, payload);
     } catch (e) {
       _log.warning('Method $method failed: $e');
@@ -291,10 +322,14 @@ class GatewayServer {
   }
 
   /// Handle a protocol method. Returns payload or throws.
-  Future<dynamic> handleMethod(String method, Map<String, dynamic> params) async {
+  Future<dynamic> handleMethod(
+    String method,
+    Map<String, dynamic> params, {
+    _Client? client,
+  }) async {
     switch (method) {
       // Core
-      case 'connect':        return _handleConnect(params);
+      case 'connect':        return _handleConnect(params, client: client);
       case 'status':         return _handleStatus();
       // Chat
       case 'chat.send':      return _handleChatSend(params);
@@ -325,16 +360,24 @@ class GatewayServer {
     }
   }
 
-  Future<Map<String, dynamic>> _handleConnect(Map<String, dynamic> params) async {
-    // Token authentication: if a token is configured, reject clients that
-    // don't supply the correct bearer token. Empty token = open access
-    // (safe only when bound to loopback 127.0.0.1).
+  Future<Map<String, dynamic>> _handleConnect(
+    Map<String, dynamic> params, {
+    _Client? client,
+  }) async {
+    // Token authentication: reject clients without the correct bearer token.
     final requiredToken = configManager.config.gateway.token;
-    if (requiredToken.isNotEmpty) {
-      final clientToken = params['token'] as String? ?? '';
-      if (clientToken != requiredToken) {
-        throw Exception('Unauthorized: invalid or missing gateway token');
-      }
+    if (requiredToken.isEmpty) {
+      throw Exception('Unauthorized: gateway token not configured');
+    }
+    final clientToken = params['token'] as String? ?? '';
+    if (clientToken != requiredToken) {
+      throw Exception('Unauthorized: invalid or missing gateway token');
+    }
+
+    if (client != null) {
+      client.connected = true;
+      client.role = params['role'] as String?;
+      client.deviceId = params['deviceId'] as String?;
     }
 
     return {
@@ -353,11 +396,13 @@ class GatewayServer {
     _currentSessionKey = sessionKey;
 
     try {
-      await agentLoop.processMessage(
-        sessionKey,
-        chatParams.text,
-        channelType: chatParams.channelType,
-        chatId: chatParams.chatId,
+      await messageQueue.enqueue(
+        QueuedMessage(
+          sessionKey: sessionKey,
+          text: chatParams.text,
+          channelType: chatParams.channelType,
+          chatId: chatParams.chatId,
+        ),
       );
 
       return ChatSendResult(
@@ -536,8 +581,8 @@ class GatewayServer {
   Future<Map<String, dynamic>> _handleSessionsCompact(Map<String, dynamic> params) async {
     final key = params['session_key'] as String?;
     if (key == null || key.isEmpty) throw ArgumentError('session_key is required');
-    await sessionManager.compact(key);
-    return {'ok': true, 'session_key': key};
+    final summary = await agentLoop.compactSession(key);
+    return {'ok': summary != null, 'session_key': key};
   }
 
   // -------------------------------------------------------------------------

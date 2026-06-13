@@ -1,9 +1,7 @@
 /// Background execution service using flutter_foreground_task.
 ///
 /// Manages the foreground service (Android) and background modes (iOS).
-/// Starts/stops the gateway+agent in a foreground service.
-/// Shows persistent notification with status.
-/// Auto-restarts on boot when configured.
+/// Starts/stops the gateway+agent+channels in a foreground service isolate.
 library;
 
 import 'dart:convert';
@@ -11,71 +9,24 @@ import 'dart:io';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
-import 'package:flutterclaw/core/agent/agent_loop.dart';
-import 'package:flutterclaw/services/overlay_service.dart';
-import 'package:flutterclaw/core/agent/provider_router.dart';
-import 'package:flutterclaw/core/agent/session_manager.dart';
-import 'package:flutterclaw/core/gateway/gateway_server.dart';
-import 'package:flutterclaw/core/providers/openai_provider.dart';
-import 'package:flutterclaw/data/models/config.dart';
-import 'package:flutterclaw/services/cron_service.dart';
+import 'package:flutterclaw/core/runtime/isolate_runtime.dart';
 import 'package:flutterclaw/services/ios_background_audio_service.dart';
 import 'package:flutterclaw/services/live_activity_service.dart';
-import 'package:flutterclaw/tools/registry.dart';
-import 'package:flutterclaw/tools/tool_status_formatter.dart';
 import 'package:logging/logging.dart';
 
 final _log = Logger('flutterclaw.background_service');
 
 /// Top-level callback for the foreground task.
-/// Must be a top-level or static function for the isolate.
 @pragma('vm:entry-point')
 void startFlutterClawTask() {
   FlutterForegroundTask.setTaskHandler(FlutterClawTaskHandler());
 }
 
-/// Result of gateway creation attempt.
-class _GatewayResult {
-  final dynamic gateway;
-  final String? error;
-  final bool success;
-
-  _GatewayResult.success(this.gateway)
-      : error = null,
-        success = true;
-
-  _GatewayResult.failure(this.error)
-      : gateway = null,
-        success = false;
-}
-
-
-/// Formats uptime seconds into a short human-readable string.
-String _formatUptime(int seconds) {
-  if (seconds < 60) return '${seconds}s';
-  if (seconds < 3600) {
-    final m = seconds ~/ 60;
-    final s = seconds % 60;
-    return '${m}m ${s}s';
-  }
-  final h = seconds ~/ 3600;
-  final m = (seconds % 3600) ~/ 60;
-  return '${h}h ${m}m';
-}
-
-/// Formats token count for notification (e.g. 1200 -> "1.2k").
-String _formatTokens(int n) {
-  if (n < 1000) return '$n';
-  if (n < 1000000) return '${(n / 1000).toStringAsFixed(1)}k';
-  return '${(n / 1000000).toStringAsFixed(1)}M';
-}
-
 /// Task handler that runs in the foreground service isolate.
 class FlutterClawTaskHandler extends TaskHandler {
-  dynamic _gatewayServer;
+  IsolateRuntime? _runtime;
   bool _running = false;
   DateTime? _startedAt;
-  ConfigManager? _configManager;
   String _gatewayState = 'stopped';
   String? _lastError;
   int _consecutiveFailures = 0;
@@ -90,7 +41,6 @@ class FlutterClawTaskHandler extends TaskHandler {
     _running = true;
     _startedAt = DateTime.now();
 
-    // On iOS, prepare background support via the audio helper
     if (Platform.isIOS) {
       final audioStarted = await IosBackgroundAudioService.start();
       if (!audioStarted) {
@@ -98,153 +48,43 @@ class FlutterClawTaskHandler extends TaskHandler {
       }
     }
 
-    // Load config first so we can show "Iniciando... host:port" immediately
-    // and so the notification updates from the initial "Iniciando gateway..." text
-    _configManager = ConfigManager();
-    await _configManager!.ensureDirectories();
-    await _configManager!.load();
-    _model = _configManager!.config.activeAgent?.modelName ??
-        _configManager!.config.agents.defaults.modelName;
-    _host = _configManager!.config.gateway.host;
-    _port = _configManager!.config.gateway.port;
-    _cachedWorkspacePath = await _configManager!.workspacePath;
-
     _gatewayState = 'starting';
     _sendNotificationToMain('FlutterClaw', 'Starting... $_host:$_port');
 
-    final result = await _createAndStartGatewayWithRetry();
-
-    if (result.success) {
-      _gatewayServer = result.gateway;
+    try {
+      _runtime = await IsolateRuntime.bootstrap();
+      _host = _runtime!.configManager.config.gateway.host;
+      _port = _runtime!.configManager.config.gateway.port;
+      _model = _runtime!.configManager.config.activeAgent?.modelName ??
+          _runtime!.configManager.config.agents.defaults.modelName;
       _gatewayState = 'running';
       _lastError = null;
       _consecutiveFailures = 0;
-
       _refreshNotification();
-
       await LiveActivityService.startActivity(
         host: _host,
         port: _port,
         model: _model,
       );
-
-      // Force a second update after a short delay so the notification
-      // reliably shows "Gateway activo" even if the first update was dropped
       await Future.delayed(const Duration(milliseconds: 800));
       _refreshNotification();
-    } else {
+    } catch (e, st) {
       _gatewayState = 'error';
-      _lastError = result.error ?? 'Unknown error';
-
+      _lastError = e.toString();
+      _log.warning('IsolateRuntime bootstrap failed', e, st);
       _sendNotificationToMain('Gateway error', _buildNotificationText());
-
       await LiveActivityService.startActivityWithError(
         host: _host,
         port: _port,
         model: _model,
-        errorMessage: result.error ?? 'Failed to start gateway',
+        errorMessage: _lastError ?? 'Failed to start gateway',
       );
     }
-  }
-
-  /// Attempt to create and start gateway with retry logic.
-  /// Uses [_configManager] which must be set before calling (done in onStart).
-  Future<_GatewayResult> _createAndStartGatewayWithRetry() async {
-    const maxAttempts = 3;
-    const retryDelays = [0, 2000, 5000]; // milliseconds
-    final configManager = _configManager!;
-
-    for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-      try {
-        if (attempt > 1) {
-          _gatewayState = 'retrying';
-          _isRetrying = true;
-          _sendNotificationToMain(
-            'Retrying...',
-            'Attempt $attempt of $maxAttempts  \u00B7  $_host:$_port',
-          );
-
-          final delayMs = retryDelays[attempt - 1];
-          if (delayMs > 0) {
-            _log.info('Waiting ${delayMs}ms before retry attempt $attempt');
-            await Future.delayed(Duration(milliseconds: delayMs));
-          }
-        }
-
-        _log.info('Gateway start attempt $attempt/$maxAttempts');
-
-        final sessionManager = SessionManager(configManager);
-        await sessionManager.load();
-
-        final toolRegistry = ToolRegistry();
-        final provider = OpenAiProvider();
-        final providerRouter = SimpleProviderRouter(provider);
-        final overlayService = OverlayService();
-
-        // Set agent identity on overlay for personalized status pill.
-        final activeAgent = configManager.config.activeAgent;
-        if (activeAgent != null) {
-          overlayService
-              .setAgent(activeAgent.name, activeAgent.emoji)
-              .catchError((_) {});
-        }
-        final agentLoop = AgentLoop(
-          configManager: configManager,
-          providerRouter: providerRouter,
-          toolRegistry: toolRegistry,
-          sessionManager: sessionManager,
-          onToolStatus: (toolName, args, {bool isDone = false}) {
-            if (isDone) {
-              return;
-            }
-            overlayService.show(formatFriendlyToolStatus(toolName, args)).catchError((_) {});
-          },
-        );
-
-        final cronSvc = CronService(configManager: configManager);
-        await cronSvc.start();
-
-        final gateway = GatewayServer(
-          configManager: configManager,
-          agentLoop: agentLoop,
-          sessionManager: sessionManager,
-          toolRegistry: toolRegistry,
-          cronService: cronSvc,
-        );
-
-        await gateway.start();
-        _log.info('Gateway started successfully on attempt $attempt');
-        _isRetrying = false;
-        return _GatewayResult.success(gateway);
-      } on SocketException catch (e) {
-        final errorMsg = 'Network error: ${e.message}';
-        _log.warning('Gateway start attempt $attempt failed: $errorMsg');
-        _lastError = errorMsg;
-
-        if (attempt == maxAttempts) {
-          return _GatewayResult.failure('Port ${_configManager?.config.gateway.port ?? 18789} in use or network error');
-        }
-      } catch (e, st) {
-        final errorMsg = e.toString();
-        _log.warning('Gateway start attempt $attempt failed: $errorMsg', e, st);
-        _lastError = errorMsg;
-
-        if (attempt == maxAttempts) {
-          return _GatewayResult.failure(errorMsg.length > 100 ? '${errorMsg.substring(0, 100)}...' : errorMsg);
-        }
-      }
-    }
-
-    return _GatewayResult.failure('Failed after $maxAttempts attempts');
   }
 
   static const MethodChannel _notificationUpdateChannel =
       MethodChannel('ai.flutterclaw/notification_update');
 
-  /// Asks the native side to update the foreground notification (title + text).
-  /// On Android the task runs in a separate FlutterEngine; we use a dedicated
-  /// method channel registered on that engine so the update is applied in the
-  /// service process (works on Android 15).
   void _sendNotificationToMain(String title, String text) {
     if (!Platform.isAndroid) {
       FlutterForegroundTask.updateService(
@@ -265,34 +105,26 @@ class FlutterClawTaskHandler extends TaskHandler {
     }
   }
 
-  /// Updates the foreground notification with current state (title + rich text).
-  /// Sends to main isolate so the update is applied from the app process.
   void _refreshNotification() {
-    final sessionCount = _gatewayServer != null
-        ? _gatewayServer.sessionManager.listSessions().length
+    final sessionCount = _runtime != null
+        ? _runtime!.sessionManager.listSessions().length
         : 0;
-    final tokensProcessed = _gatewayServer != null
-        ? _gatewayServer.sessionManager.listSessions().fold<int>(
-            0, (int sum, SessionMeta s) => sum + s.totalTokens)
+    final tokensProcessed = _runtime != null
+        ? _runtime!.sessionManager
+            .listSessions()
+            .fold<int>(0, (sum, s) => sum + s.totalTokens)
         : 0;
     final title = _gatewayState == 'running'
         ? 'Gateway active'
         : _gatewayState == 'error'
             ? 'Gateway error'
             : 'Gateway stopped';
-    final text = _buildNotificationText(
+    _sendNotificationToMain(title, _buildNotificationText(
       sessionCount: sessionCount,
       tokensProcessed: tokensProcessed,
-    );
-    _sendNotificationToMain(title, text);
+    ));
   }
 
-  /// Builds notification text with status, model, address, uptime; optionally
-  /// sessions and tokens (like Live Activity on iOS).
-  ///
-  /// On Android, BigTextStyle expands multi-line text. When running, includes
-  /// active channels, automation rules, and action center unread counts
-  /// read directly from workspace JSON files.
   String _buildNotificationText({
     int? sessionCount,
     int? tokensProcessed,
@@ -305,127 +137,40 @@ class FlutterClawTaskHandler extends TaskHandler {
 
     switch (_gatewayState) {
       case 'running':
-        final line1 = '\u25CF $modelLabel  \u00B7  $addr  \u00B7  ${_formatUptime(uptime)}';
+        final line1 =
+            '\u25CF $modelLabel  \u00B7  $addr  \u00B7  ${_formatUptime(uptime)}';
         final lines = <String>[line1];
-
         if (sessionCount != null && tokensProcessed != null) {
-          final sessionsStr = sessionCount == 1 ? '1 chat' : '$sessionCount chats';
-          final tokensStr = _formatTokens(tokensProcessed);
-          lines.add('$sessionsStr  \u00B7  $tokensStr tokens');
+          lines.add('$sessionCount chats  \u00B7  ${_formatTokens(tokensProcessed)} tokens');
         }
-
-        // Rich status lines from workspace state (best-effort, non-blocking)
-        final statusLine = _buildRichStatusLine();
-        if (statusLine.isNotEmpty) {
-          lines.add(statusLine);
-        }
-
         return lines.join('\n');
       case 'starting':
         return '\u25CB Starting...  \u00B7  $addr';
-      case 'retrying':
-        return '\u21BA Retrying...  \u00B7  $addr';
-      case 'restarting':
-        return '\u21BA Restarting gateway...';
       case 'error':
         final err = _lastError ?? 'Unknown error';
         final short = err.length > 60 ? '${err.substring(0, 60)}...' : err;
         return '\u26A0 $short';
-      case 'stopped':
-        return '\u25A1 Stopped';
       default:
         return _gatewayState;
     }
   }
 
-  /// Cached workspace path for notification status reads.
   String? _cachedWorkspacePath;
-
-  /// Reads workspace JSON files to build a rich status line for the notification.
-  /// Returns empty string if no interesting state exists.
-  String _buildRichStatusLine() {
-    try {
-      final ws = _cachedWorkspacePath;
-      if (ws == null) return '';
-
-      final parts = <String>[];
-
-      // Count automation rules
-      final rulesFile = File('$ws/automation/rules.json');
-      if (rulesFile.existsSync()) {
-        try {
-          final list = jsonDecode(rulesFile.readAsStringSync()) as List;
-          final enabled = list.where((r) => r['enabled'] == true).length;
-          if (enabled > 0) {
-            parts.add('$enabled rule${enabled == 1 ? '' : 's'}');
-          }
-        } catch (_) {}
-      }
-
-      // Count active cron jobs
-      final cronFile = File('$ws/cron/jobs.json');
-      if (cronFile.existsSync()) {
-        try {
-          final list = jsonDecode(cronFile.readAsStringSync()) as List;
-          final enabled = list.where((j) => j['enabled'] == true).length;
-          if (enabled > 0) {
-            parts.add('$enabled cron');
-          }
-        } catch (_) {}
-      }
-
-      // Count active watchers
-      final watcherFile = File('$ws/watcher/watchers.json');
-      if (watcherFile.existsSync()) {
-        try {
-          final list = jsonDecode(watcherFile.readAsStringSync()) as List;
-          final enabled = list.where((w) => w['enabled'] == true).length;
-          if (enabled > 0) {
-            parts.add('$enabled watcher${enabled == 1 ? '' : 's'}');
-          }
-        } catch (_) {}
-      }
-
-      // Count action center unread items
-      final acFile = File('$ws/action_center/items.json');
-      if (acFile.existsSync()) {
-        try {
-          final list = jsonDecode(acFile.readAsStringSync()) as List;
-          final unread = list.where((i) => i['status'] == 'unread').length;
-          if (unread > 0) {
-            parts.add('$unread unread');
-          }
-        } catch (_) {}
-      }
-
-      if (parts.isEmpty) return '';
-      return parts.join('  \u00B7  ');
-    } catch (_) {
-      return '';
-    }
-  }
 
   @override
   void onRepeatEvent(DateTime timestamp) {
     if (!_running) return;
-
     final uptime = _startedAt != null
         ? DateTime.now().difference(_startedAt!).inSeconds
         : 0;
-    // Keep _model in sync (it may have been updated after initial start)
-    _model = _configManager?.config.agents.defaults.modelName ?? _model;
 
-    if (_gatewayServer != null) {
-      // Check gateway health
-      final isHealthy = _gatewayServer.isHealthy();
-
+    if (_runtime != null) {
+      final isHealthy = _runtime!.gateway.isHealthy();
       if (isHealthy) {
         _consecutiveFailures = 0;
         _gatewayState = 'running';
-
         _refreshNotification();
-
-        final sessions = _gatewayServer.sessionManager.listSessions();
+        final sessions = _runtime!.sessionManager.listSessions();
         LiveActivityService.updateActivity(
           isRunning: true,
           status: 'running',
@@ -436,85 +181,32 @@ class FlutterClawTaskHandler extends TaskHandler {
         );
       } else {
         _consecutiveFailures++;
-        _log.warning('Gateway health check failed (${_consecutiveFailures}/3)');
-
         if (_consecutiveFailures >= 3 && !_isRetrying) {
-          _log.severe('Gateway unhealthy after 3 checks, attempting restart');
           _attemptGatewayRestart();
         }
       }
-    } else {
-      // Gateway is null, update notification and Live Activity to show error state
-      _refreshNotification();
-
-      LiveActivityService.updateActivity(
-        isRunning: false,
-        status: _gatewayState,
-        tokensProcessed: 0,
-        model: _model,
-        sessionCount: 0,
-        uptimeSeconds: uptime,
-        errorMessage: _lastError,
-      );
     }
   }
 
-  /// Attempt to restart a failed gateway.
   void _attemptGatewayRestart() async {
     if (_isRetrying) return;
-
-    _log.info('Attempting to restart gateway');
+    _isRetrying = true;
     _gatewayState = 'restarting';
-    _consecutiveFailures = 0;
-
-    // Stop old gateway if it exists
-    if (_gatewayServer != null) {
-      try {
-        await _gatewayServer.stop();
-      } catch (e) {
-        _log.warning('Error stopping unhealthy gateway: $e');
-      }
-      _gatewayServer = null;
-    }
-
-    // Try to restart with retry logic
-    final result = await _createAndStartGatewayWithRetry();
-    // Refresh instance fields in case config changed
-    _model = _configManager?.config.agents.defaults.modelName ?? _model;
-    _host = _configManager?.config.gateway.host ?? _host;
-    _port = _configManager?.config.gateway.port ?? _port;
-
-    if (result.success) {
-      _gatewayServer = result.gateway;
+    try {
+      await _runtime?.stop();
+    } catch (_) {}
+    _runtime = null;
+    try {
+      _runtime = await IsolateRuntime.bootstrap();
       _gatewayState = 'running';
       _lastError = null;
-      _startedAt = DateTime.now(); // Reset uptime
-
-      _refreshNotification();
-
-      LiveActivityService.updateActivity(
-        isRunning: true,
-        status: 'running',
-        tokensProcessed: 0,
-        model: _model,
-        sessionCount: 0,
-        uptimeSeconds: 0,
-      );
-    } else {
+      _startedAt = DateTime.now();
+    } catch (e) {
       _gatewayState = 'error';
-      _lastError = result.error ?? 'Restart failed';
-
-      _sendNotificationToMain('Restart error', _buildNotificationText());
-
-      LiveActivityService.updateActivity(
-        isRunning: false,
-        status: 'error',
-        tokensProcessed: 0,
-        model: _model,
-        sessionCount: 0,
-        uptimeSeconds: 0,
-        errorMessage: result.error,
-      );
+      _lastError = e.toString();
+    } finally {
+      _isRetrying = false;
+      _refreshNotification();
     }
   }
 
@@ -522,52 +214,46 @@ class FlutterClawTaskHandler extends TaskHandler {
   Future<void> onDestroy(DateTime timestamp, bool isTimeout) async {
     _log.info('FlutterClawTaskHandler onDestroy (isTimeout: $isTimeout)');
     _running = false;
-
-    // Tear down iOS background helper
     if (Platform.isIOS) {
       await IosBackgroundAudioService.stop();
     }
-
     await LiveActivityService.endActivity();
-    if (_gatewayServer != null) {
-      try {
-        await _gatewayServer.stop();
-      } catch (e) {
-        _log.warning('Error stopping gateway: $e');
-      }
-      _gatewayServer = null;
-    }
+    await _runtime?.stop();
+    _runtime = null;
   }
 
   @override
-  void onReceiveData(Object data) {
-    _log.fine('onReceiveData: $data');
-  }
+  void onReceiveData(Object data) {}
 
   @override
   void onNotificationButtonPressed(String id) {
-    _log.fine('onNotificationButtonPressed: $id');
     if (id == 'stop') {
       FlutterForegroundTask.stopService();
     }
   }
 
   @override
-  void onNotificationPressed() {
-    _log.fine('onNotificationPressed');
-  }
+  void onNotificationPressed() {}
 
   @override
-  void onNotificationDismissed() {
-    _log.fine('onNotificationDismissed');
-  }
+  void onNotificationDismissed() {}
+}
+
+String _formatUptime(int seconds) {
+  if (seconds < 60) return '${seconds}s';
+  if (seconds < 3600) return '${seconds ~/ 60}m ${seconds % 60}s';
+  return '${seconds ~/ 3600}h ${(seconds % 3600) ~/ 60}m';
+}
+
+String _formatTokens(int n) {
+  if (n < 1000) return '$n';
+  return '${(n / 1000).toStringAsFixed(1)}k';
 }
 
 /// Service for managing the foreground task lifecycle.
 class BackgroundService {
   static bool _initialized = false;
 
-  /// Icon and buttons for the foreground notification.
   static const notificationIcon = NotificationIcon(
     metaDataName: 'com.flutterclaw.notification_icon',
   );
@@ -576,11 +262,8 @@ class BackgroundService {
     NotificationButton(id: 'stop', text: 'Stop'),
   ];
 
-  /// Initialize the foreground task. Call once at app startup (e.g. in main).
-  /// Also call [FlutterForegroundTask.initCommunicationPort] in main before runApp.
   static Future<void> initializeService() async {
     if (_initialized) return;
-
     FlutterForegroundTask.init(
       androidNotificationOptions: AndroidNotificationOptions(
         channelId: 'flutterclaw_foreground',
@@ -604,17 +287,14 @@ class BackgroundService {
         allowWifiLock: false,
       ),
     );
-
     _initialized = true;
     _log.info('BackgroundService initialized');
   }
 
-  /// Start the foreground service (gateway + agent).
   static Future<ServiceRequestResult> startService() async {
     if (!_initialized) {
       await initializeService();
     }
-
     return FlutterForegroundTask.startService(
       notificationTitle: 'FlutterClaw',
       notificationText: 'Starting gateway...',
@@ -624,7 +304,6 @@ class BackgroundService {
     );
   }
 
-  /// Stop the foreground service.
   static Future<ServiceRequestResult> stopService() async {
     return FlutterForegroundTask.stopService();
   }

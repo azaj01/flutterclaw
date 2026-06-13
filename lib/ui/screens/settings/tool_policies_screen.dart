@@ -26,7 +26,7 @@ import 'package:flutterclaw/l10n/l10n_extension.dart';
       return (l10n.toolWebSearch, l10n.toolWebSearchDesc);
     case 'http_request':
       return (l10n.toolHttpRequests, l10n.toolHttpRequestsDesc);
-    case 'sandbox_exec':
+    case 'run_shell_command':
       return (l10n.toolSandboxShell, l10n.toolSandboxShellDesc);
     case 'image_generate':
       return (l10n.toolImageGeneration, l10n.toolImageGenerationDesc);
@@ -55,7 +55,7 @@ const _kNetworkTools = [
 ];
 
 const _kSystemTools = [
-  'sandbox_exec',
+  'run_shell_command',
   'image_generate',
   'ui_launch_app',
   'ui_launch_intent',
@@ -169,7 +169,11 @@ class _ToolPoliciesScreenState extends ConsumerState<ToolPoliciesScreen> {
       if (!updated.contains(toolName)) updated.add(toolName);
     }
     configManager.update(config.copyWith(
-      tools: ToolsConfig(web: config.tools.web, disabled: updated),
+      tools: ToolsConfig(
+        web: config.tools.web,
+        browser: config.tools.browser,
+        disabled: updated,
+      ),
     ));
     await configManager.save();
     ref.invalidate(toolRegistryProvider);

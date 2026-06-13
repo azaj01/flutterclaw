@@ -9,8 +9,12 @@
 /// skipped so the catalog's display names and metadata take precedence.
 library;
 
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:logging/logging.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../data/models/model_catalog.dart';
 
@@ -22,12 +26,20 @@ class DiscoveredModel {
   final String displayName;
   final String providerId;
   final bool isFree;
+  final int contextWindow;
+  final List<String> inputModalities;
+  final double pricingPrompt;
+  final double pricingCompletion;
 
   const DiscoveredModel({
     required this.id,
     required this.displayName,
     required this.providerId,
     this.isFree = false,
+    this.contextWindow = 0,
+    this.inputModalities = const ['text'],
+    this.pricingPrompt = 0,
+    this.pricingCompletion = 0,
   });
 
   /// Convert to a [CatalogModel] for display alongside static entries.
@@ -36,8 +48,32 @@ class DiscoveredModel {
         displayName: displayName,
         providerId: providerId,
         isFree: isFree,
-        contextWindow: 0, // unknown
-        input: const ['text'],
+        contextWindow: contextWindow,
+        input: inputModalities,
+      );
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'displayName': displayName,
+        'providerId': providerId,
+        'isFree': isFree,
+        'contextWindow': contextWindow,
+        'inputModalities': inputModalities,
+        'pricingPrompt': pricingPrompt,
+        'pricingCompletion': pricingCompletion,
+      };
+
+  factory DiscoveredModel.fromJson(Map<String, dynamic> json) =>
+      DiscoveredModel(
+        id: json['id'] as String,
+        displayName: json['displayName'] as String,
+        providerId: json['providerId'] as String? ?? 'openrouter',
+        isFree: json['isFree'] as bool? ?? false,
+        contextWindow: json['contextWindow'] as int? ?? 0,
+        inputModalities:
+            (json['inputModalities'] as List?)?.cast<String>() ?? const ['text'],
+        pricingPrompt: (json['pricingPrompt'] as num?)?.toDouble() ?? 0,
+        pricingCompletion: (json['pricingCompletion'] as num?)?.toDouble() ?? 0,
       );
 }
 
@@ -45,6 +81,76 @@ class ModelDiscoveryService {
   final Dio _dio;
 
   ModelDiscoveryService({Dio? dio}) : _dio = dio ?? Dio();
+
+  /// In-memory cache for OpenRouter models.
+  List<DiscoveredModel>? _openRouterCache;
+  DateTime? _openRouterCacheTime;
+
+  static const _cacheTtl = Duration(hours: 1);
+  static const _cacheFileName = 'openrouter_models.json';
+
+  /// Returns the full OpenRouter model list with caching (memory + disk, 1h TTL).
+  Future<List<DiscoveredModel>> getOpenRouterModels({
+    String? apiKey,
+    bool forceRefresh = false,
+  }) async {
+    if (!forceRefresh &&
+        _openRouterCache != null &&
+        _openRouterCacheTime != null &&
+        DateTime.now().difference(_openRouterCacheTime!) < _cacheTtl) {
+      return _openRouterCache!;
+    }
+
+    if (!forceRefresh) {
+      final disk = await _readDiskCache();
+      if (disk != null) {
+        _openRouterCache = disk;
+        _openRouterCacheTime = DateTime.now();
+        return disk;
+      }
+    }
+
+    final models = await _discoverOpenRouter(apiKey ?? '');
+    if (models.isNotEmpty) {
+      _openRouterCache = models;
+      _openRouterCacheTime = DateTime.now();
+      _writeDiskCache(models);
+    }
+    return models;
+  }
+
+  Future<List<DiscoveredModel>?> _readDiskCache() async {
+    try {
+      final dir = await getApplicationSupportDirectory();
+      final file = File('${dir.path}/cache/$_cacheFileName');
+      if (!file.existsSync()) return null;
+      final json = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
+      final ts = DateTime.tryParse(json['timestamp'] as String? ?? '');
+      if (ts == null || DateTime.now().difference(ts) > _cacheTtl) return null;
+      final list = (json['models'] as List)
+          .map((m) => DiscoveredModel.fromJson(m as Map<String, dynamic>))
+          .toList();
+      return list;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _writeDiskCache(List<DiscoveredModel> models) async {
+    try {
+      final dir = await getApplicationSupportDirectory();
+      final cacheDir = Directory('${dir.path}/cache');
+      if (!cacheDir.existsSync()) cacheDir.createSync(recursive: true);
+      final file = File('${cacheDir.path}/$_cacheFileName');
+      final payload = jsonEncode({
+        'timestamp': DateTime.now().toIso8601String(),
+        'models': models.map((m) => m.toJson()).toList(),
+      });
+      await file.writeAsString(payload);
+    } catch (e) {
+      _log.fine('Failed to write OpenRouter cache: $e');
+    }
+  }
 
   /// Discover available models for the given [providerId].
   ///
@@ -66,6 +172,8 @@ class ModelDiscoveryService {
           );
         case 'openrouter':
           return await _discoverOpenRouter(apiKey);
+        case 'anthropic':
+          return await _discoverAnthropic(apiKey);
         case 'openai':
         case 'xai':
         case 'groq':
@@ -134,7 +242,7 @@ class ModelDiscoveryService {
       'https://openrouter.ai/api/v1/models',
       options: Options(
         headers: headers,
-        receiveTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 15),
         validateStatus: (_) => true,
       ),
     );
@@ -144,17 +252,55 @@ class ModelDiscoveryService {
     return data.map((m) {
       final id = (m['id'] as String?) ?? '';
       final name = (m['name'] as String?) ?? id;
-      // pricing: prompt price per token; 0 = free
       final pricing = m['pricing'] as Map?;
-      final promptPrice = double.tryParse('${pricing?['prompt'] ?? '1'}') ?? 1.0;
-      // Use the API's model id as-is (e.g. `minimax/minimax-m2.5:free`).
-      // Do not prefix with `openrouter/` — that breaks chat (404) because the
-      // upstream expects `org/model`, not `openrouter/org/model`.
+      final promptPrice =
+          double.tryParse('${pricing?['prompt'] ?? '1'}') ?? 1.0;
+      final completionPrice =
+          double.tryParse('${pricing?['completion'] ?? '1'}') ?? 1.0;
+      final contextLen = (m['context_length'] as int?) ?? 0;
+      final arch = m['architecture'] as Map?;
+      final modalities =
+          (arch?['input_modalities'] as List?)?.cast<String>() ?? const ['text'];
       return DiscoveredModel(
         id: id,
         displayName: name,
         providerId: 'openrouter',
         isFree: promptPrice == 0.0,
+        contextWindow: contextLen,
+        inputModalities: modalities,
+        pricingPrompt: promptPrice * 1e6,
+        pricingCompletion: completionPrice * 1e6,
+      );
+    }).toList();
+  }
+
+  // -----------------------------------------------------------------------
+  // Anthropic — GET /v1/models  (requires x-api-key + anthropic-version)
+  // -----------------------------------------------------------------------
+  Future<List<DiscoveredModel>> _discoverAnthropic(String apiKey) async {
+    if (apiKey.isEmpty) return [];
+
+    final response = await _dio.get(
+      'https://api.anthropic.com/v1/models?limit=100',
+      options: Options(
+        headers: {
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        },
+        receiveTimeout: const Duration(seconds: 10),
+        validateStatus: (_) => true,
+      ),
+    );
+    if ((response.statusCode ?? 0) != 200) return [];
+
+    final data = response.data?['data'] as List? ?? [];
+    return data.map((m) {
+      final id = (m['id'] as String?) ?? '';
+      final name = (m['display_name'] as String?) ?? id;
+      return DiscoveredModel(
+        id: id,
+        displayName: name,
+        providerId: 'anthropic',
       );
     }).toList();
   }

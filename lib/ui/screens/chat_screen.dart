@@ -8,6 +8,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutterclaw/core/app_providers.dart';
 import 'package:flutterclaw/l10n/l10n_extension.dart';
+import 'package:flutterclaw/ui/screens/settings/providers_models_screen.dart';
 import 'package:flutterclaw/services/analytics_service.dart';
 import 'package:flutterclaw/ui/widgets/agent_switcher_chip.dart';
 import 'package:flutterclaw/ui/widgets/chat/message_bubble.dart';
@@ -75,6 +76,59 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
               .length;
           if (nextRunning < prevRunning) HapticFeedback.selectionClick();
         }
+      });
+
+      // Surface silent LLM retries so the user knows what's happening.
+      ref.listenManual(llmRetryEventProvider, (_, next) {
+        if (next.value == null || !mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.retryingRequest),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      });
+
+      // Notify when auto-compaction summarised older context.
+      ref.listenManual(compactionEventProvider, (_, next) {
+        if (next.value == null || !mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.contextCompacted),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      });
+
+      // Listen for model unavailability events and show banner.
+      ref.listenManual(modelUnavailableEventProvider, (_, next) {
+        final event = next.value;
+        if (event == null || !mounted) return;
+        ScaffoldMessenger.of(context).showMaterialBanner(
+          MaterialBanner(
+            content: Text(context.l10n.modelUnavailableMessage(event.modelId)),
+            leading: const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ProvidersModelsScreen(),
+                    ),
+                  );
+                },
+                child: Text(context.l10n.changeModel),
+              ),
+              TextButton(
+                onPressed: () =>
+                    ScaffoldMessenger.of(context).hideCurrentMaterialBanner(),
+                child: Text(context.l10n.cancel),
+              ),
+            ],
+          ),
+        );
       });
     });
   }
@@ -258,6 +312,33 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
     });
   }
 
+  /// Confirms (when there is history) and starts a fresh session, resetting
+  /// the persisted transcript — not just the visible messages.
+  Future<void> _startNewConversation() async {
+    final hasMessages = ref.read(chatProvider).isNotEmpty;
+    if (hasMessages) {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(ctx.l10n.newConversationTitle),
+          content: Text(ctx.l10n.newConversationMessage),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(ctx.l10n.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(ctx.l10n.startNewConversation),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+    }
+    await ref.read(chatProvider.notifier).startNewSession();
+  }
+
   Future<void> _sendMessage() async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
@@ -356,7 +437,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen>
             IconButton(
               icon: const Icon(Icons.add_comment_outlined),
               tooltip: context.l10n.newSession,
-              onPressed: () => ref.read(chatProvider.notifier).clear(),
+              onPressed: _startNewConversation,
             ),
           ],
         ),

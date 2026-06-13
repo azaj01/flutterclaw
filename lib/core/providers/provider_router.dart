@@ -128,7 +128,9 @@ class ProviderRouter {
         modelEntry.apiBase ??
         vendorConfig?.defaultApiBase ??
         'https://api.openai.com/v1';
-    final apiKey = modelEntry.apiKey ?? '';
+
+    // Resolve API key: per-model override > credentialId > base provider key.
+    final apiKey = _resolveApiKey(modelEntry);
 
     // OpenRouter: send the full upstream model id (e.g. "minimax/minimax-m2.5:free",
     // "xiaomi/mimo-v2-pro"). Use [ModelEntry.provider], not [ModelEntry.vendor] —
@@ -141,8 +143,9 @@ class ProviderRouter {
             ? modelEntry.model
             : modelEntry.modelId;
 
-    // Resolve AWS credentials for Bedrock from provider-level credentials.
-    final cred = _config.providerCredentials[modelEntry.provider];
+    // Resolve credential for provider-level fields (AWS, etc).
+    final cred = _config.providerCredentials[
+        modelEntry.credentialId ?? modelEntry.provider];
 
     return LlmRequest(
       model: modelForApi,
@@ -157,6 +160,15 @@ class ProviderRouter {
       awsRegion: cred?.awsRegion,
       awsAuthMode: cred?.awsAuthMode,
     );
+  }
+
+  String _resolveApiKey(ModelEntry entry) {
+    if (entry.apiKey != null && entry.apiKey!.isNotEmpty) return entry.apiKey!;
+    if (entry.credentialId != null) {
+      final cred = _config.providerCredentials[entry.credentialId];
+      if (cred != null && cred.apiKey.isNotEmpty) return cred.apiKey;
+    }
+    return _config.providerCredentials[entry.provider]?.apiKey ?? '';
   }
 
   /// Resolves the model and returns the provider plus request, or null if

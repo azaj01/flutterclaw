@@ -466,9 +466,9 @@ class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
             channelType: 'telegram',
             iconColor: const Color(0xFF24A1DE),
             name: 'Telegram',
-            subtitle: _channelStatus(
+            subtitle: _channelSubtitle(
+              'telegram',
               config.channels.telegram.enabled,
-              adapters.any((a) => a.type == 'telegram'),
             ),
             isConnected: adapters.any(
               (a) => a.type == 'telegram' && a.isConnected,
@@ -482,9 +482,9 @@ class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
             channelType: 'discord',
             iconColor: const Color(0xFF5865F2),
             name: 'Discord',
-            subtitle: _channelStatus(
+            subtitle: _channelSubtitle(
+              'discord',
               config.channels.discord.enabled,
-              adapters.any((a) => a.type == 'discord'),
             ),
             isConnected: adapters.any(
               (a) => a.type == 'discord' && a.isConnected,
@@ -498,9 +498,9 @@ class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
             channelType: 'slack',
             iconColor: const Color(0xFF4A154B),
             name: 'Slack',
-            subtitle: _channelStatus(
+            subtitle: _channelSubtitle(
+              'slack',
               config.channels.slack.enabled,
-              adapters.any((a) => a.type == 'slack'),
             ),
             isConnected: adapters.any(
               (a) => a.type == 'slack' && a.isConnected,
@@ -514,9 +514,9 @@ class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
             channelType: 'signal',
             iconColor: const Color(0xFF3A76F0),
             name: 'Signal',
-            subtitle: _channelStatus(
+            subtitle: _channelSubtitle(
+              'signal',
               config.channels.signal.enabled,
-              adapters.any((a) => a.type == 'signal'),
             ),
             isConnected: adapters.any(
               (a) => a.type == 'signal' && a.isConnected,
@@ -530,9 +530,9 @@ class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
             channelType: 'whatsapp',
             iconColor: const Color(0xFF25D366),
             name: 'WhatsApp',
-            subtitle: _channelStatus(
+            subtitle: _channelSubtitle(
+              'whatsapp',
               config.channels.whatsapp.enabled,
-              adapters.any((a) => a.type == 'whatsapp'),
             ),
             isConnected: adapters.any(
               (a) => a.type == 'whatsapp' && a.isConnected,
@@ -568,9 +568,16 @@ class _ChannelsScreenState extends ConsumerState<ChannelsScreen> {
     }
   }
 
-  String _channelStatus(bool configured, bool running) {
+  /// Subtitle for a channel tile, consistent with the status badge:
+  /// shows the last connection error if any, otherwise the real
+  /// connected/configured/not-set-up state based on `adapter.isConnected`.
+  String _channelSubtitle(String type, bool configured) {
+    final router = ref.read(channelRouterProvider);
+    final error = router.lastErrorFor(type);
+    if (error != null) return context.l10n.channelErrorLabel(error);
     if (!configured) return context.l10n.notSetUpStatus;
-    if (running) return context.l10n.connected;
+    final adapter = router.adapterFor(type);
+    if (adapter != null && adapter.isConnected) return context.l10n.connected;
     return context.l10n.configuredStatus;
   }
 

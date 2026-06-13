@@ -99,6 +99,7 @@ import 'package:flutterclaw/tools/tts_tool.dart';
 import 'package:flutterclaw/tools/pdf_tool.dart';
 import 'package:flutterclaw/tools/live_voice_tool.dart';
 import 'package:flutterclaw/services/connectivity_service.dart';
+import 'package:flutterclaw/services/model_discovery_service.dart';
 import 'package:flutterclaw/services/battery_service.dart';
 import 'package:flutterclaw/services/auth_profile_service.dart';
 import 'package:flutterclaw/services/secrets_resolver.dart';
@@ -119,6 +120,9 @@ final configManagerProvider = Provider<ConfigManager>((ref) {
             ? ref_.substring(r'{"$ref":"secrets/'.length).replaceAll('"}}', '').replaceAll('"}', '')
             : ref_,
       );
+  // Writer used by ConfigManager.save() to externalize plaintext API keys
+  // from config.json into the platform keychain.
+  mgr.secretsWriter = (name, value) => SecureKeyStore.saveSecret(name, value);
   return mgr;
 });
 
@@ -340,6 +344,9 @@ final toolRegistryProvider = Provider<ToolRegistry>((ref) {
 
   // Apply tool policies from config
   registry.setDisabledTools(configManager.config.tools.disabled);
+  ConfigManager.addSaveListener(() async {
+    registry.setDisabledTools(configManager.config.tools.disabled);
+  });
 
   Future<String> wsPath() => configManager.workspacePath;
 
@@ -811,12 +818,28 @@ final toolRegistryProvider = Provider<ToolRegistry>((ref) {
   return registry;
 });
 
-final providerRouterProvider = Provider<ProviderRouter>((ref) {
+final providerRouterProvider = Provider<FailoverProviderRouter>((ref) {
   final configManager = ref.read(configManagerProvider);
   return FailoverProviderRouter(
     primary: OpenAiProvider(),
     configManager: configManager,
   );
+});
+
+/// Emits when a model returns 404 / model_not_found.
+final modelUnavailableEventProvider = StreamProvider<ModelUnavailableEvent>((ref) {
+  final router = ref.watch(providerRouterProvider);
+  return router.modelUnavailableEvents;
+});
+
+/// Emits the attempt number during silent LLM retries (transient errors).
+final llmRetryEventProvider = StreamProvider<int>((ref) {
+  return ref.watch(providerRouterProvider).retryEvents;
+});
+
+/// Emits the session key whenever auto-compaction ran for a session.
+final compactionEventProvider = StreamProvider<String>((ref) {
+  return ref.watch(agentLoopProvider).compactionEvents;
 });
 
 final agentLoopProvider = Provider<AgentLoop>((ref) {
@@ -869,12 +892,8 @@ final agentLoopProvider = Provider<AgentLoop>((ref) {
       }
     },
   );
-  // Bind the singleton proxy so sessions_spawn / subagents steer can call
-  // the agent loop without a circular provider dependency.
-  SubagentLoopProxy.instance.bind((sessionKey, task) async {
-    final response = await loop.processMessage(sessionKey, task);
-    return response.content;
-  });
+  // SubagentLoopProxy is bound in messageQueueProvider so all subagent/cron
+  // runs go through per-session serialization.
   return loop;
 });
 
@@ -939,28 +958,31 @@ AudioTranscriptionService? _buildTranscriptionService(ConfigManager configManage
 }
 
 final channelRouterProvider = Provider<ChannelRouter>((ref) {
-  final agentLoop = ref.read(agentLoopProvider);
   final webChat = ref.read(webChatAdapterProvider);
   final configManager = ref.read(configManagerProvider);
   final tts = ref.read(textToSpeechServiceProvider);
+
+  final messageQueue = ref.read(messageQueueProvider);
 
   late final ChannelRouter router;
   router = ChannelRouter(
     transcriptionServiceFactory: () => _buildTranscriptionService(configManager),
     agentHandler: (IncomingMessage msg) async {
       try {
-        final response = await agentLoop.processMessage(
-          msg.sessionKey,
-          msg.text,
-          channelType: msg.channelType,
-          chatId: msg.chatId,
-          contentBlocks: msg.contentBlocks,
-          channelContext: msg.channelContext,
-          onIntermediateMessage: (text) => router.sendMessage(
-            OutgoingMessage(
-              channelType: msg.channelType,
-              chatId: msg.chatId,
-              text: text,
+        final response = await messageQueue.enqueue(
+          QueuedMessage(
+            sessionKey: msg.sessionKey,
+            text: msg.text,
+            channelType: msg.channelType,
+            chatId: msg.chatId,
+            contentBlocks: msg.contentBlocks,
+            channelContext: msg.channelContext,
+            onIntermediateMessage: (text) => router.sendMessage(
+              OutgoingMessage(
+                channelType: msg.channelType,
+                chatId: msg.chatId,
+                text: text,
+              ),
             ),
           ),
         );
@@ -1076,27 +1098,156 @@ final chatCommandHandlerProvider = Provider<ChatCommandHandler>((ref) {
 
 final messageQueueProvider = Provider<MessageQueue>((ref) {
   final agentLoop = ref.read(agentLoopProvider);
-  return MessageQueue(
-    onRun: (sessionKey, text, channelType, chatId) async {
-      await agentLoop.processMessage(
-        sessionKey,
-        text,
-        channelType: channelType,
-        chatId: chatId,
-      );
-    },
+  final queue = MessageQueue(
+    onRun: (message) => agentLoop.processMessage(
+      message.sessionKey,
+      message.text,
+      channelType: message.channelType,
+      chatId: message.chatId,
+      contentBlocks: message.contentBlocks,
+      channelContext: message.channelContext,
+      onIntermediateMessage: message.onIntermediateMessage,
+    ),
   );
+  SubagentLoopProxy.instance.bind((sessionKey, task) async {
+    final response = await queue.enqueueText(
+      sessionKey: sessionKey,
+      text: task,
+    );
+    return response.content;
+  });
+  return queue;
 });
 
 final heartbeatRunnerProvider = Provider<HeartbeatRunner>((ref) {
   return HeartbeatRunner(
     configManager: ref.read(configManagerProvider),
-    agentLoop: ref.read(agentLoopProvider),
+    messageQueue: ref.read(messageQueueProvider),
   );
 });
 
 final pairingServiceProvider = Provider<PairingService>((ref) {
   return PairingService(configManager: ref.read(configManagerProvider));
+});
+
+/// Centralised lifecycle control for channel adapters.
+///
+/// Used by the channel settings screens to hot-connect or disconnect a
+/// channel after its configuration changed. Adapters started through this
+/// class always route incoming messages through the [ChannelRouter]'s agent
+/// handler (voice transcription, TTS replies, offline queue), unlike the old
+/// per-screen ad-hoc handlers.
+class ChannelControl {
+  ChannelControl(this._ref);
+  final Ref _ref;
+
+  /// Builds an adapter for [type] from the current config, or returns null
+  /// if the channel is disabled or not fully configured.
+  Future<ChannelAdapter?> buildAdapter(String type) async {
+    final config = _ref.read(configManagerProvider).config;
+    final pairingService = _ref.read(pairingServiceProvider);
+    final commandHandler = _ref.read(chatCommandHandlerProvider);
+
+    Future<String?> handleCommand(String sessionKey, String command) async {
+      final result = await commandHandler.handle(sessionKey, command);
+      return result.handled ? result.response : null;
+    }
+
+    switch (type) {
+      case 'telegram':
+        final c = config.channels.telegram;
+        if (!c.enabled || c.token == null || c.token!.isEmpty) return null;
+        return TelegramChannelAdapter(
+          token: c.token!,
+          allowedUserIds: c.allowFrom,
+          dmPolicy: c.dmPolicy,
+          pairingService: pairingService,
+          typingMode: config.agents.defaults.typingMode,
+          chatCommandHandler: handleCommand,
+        );
+      case 'discord':
+        final c = config.channels.discord;
+        if (!c.enabled || c.token == null || c.token!.isEmpty) return null;
+        return DiscordChannelAdapter(
+          token: c.token!,
+          allowedUserIds: c.allowFrom,
+          dmPolicy: c.dmPolicy,
+          pairingService: pairingService,
+          chatCommandHandler: handleCommand,
+        );
+      case 'whatsapp':
+        final c = config.channels.whatsapp;
+        if (!c.enabled) return null;
+        if (!await WhatsAppChannelAdapter.hasLinkedAuth(c.authDir)) {
+          Logger('ChannelControl').info(
+            'Skipping WhatsApp: channel enabled but no linked auth found yet',
+          );
+          return null;
+        }
+        return WhatsAppChannelAdapter(
+          authDir: c.authDir,
+          allowedUserIds: c.allowFrom,
+          dmPolicy: c.dmPolicy,
+          selfChatMode: c.selfChatMode,
+          pairingService: pairingService,
+          chatCommandHandler: handleCommand,
+        );
+      case 'slack':
+        final c = config.channels.slack;
+        if (!c.enabled ||
+            c.botToken == null ||
+            c.botToken!.isEmpty ||
+            c.appToken == null ||
+            c.appToken!.isEmpty) {
+          return null;
+        }
+        return SlackChannelAdapter(
+          botToken: c.botToken!,
+          appToken: c.appToken!,
+          allowedUserIds: c.allowFrom,
+          chatCommandHandler: handleCommand,
+        );
+      case 'signal':
+        final c = config.channels.signal;
+        if (!c.enabled ||
+            c.apiUrl == null ||
+            c.apiUrl!.isEmpty ||
+            c.account == null ||
+            c.account!.isEmpty) {
+          return null;
+        }
+        return SignalChannelAdapter(
+          apiUrl: c.apiUrl!,
+          account: c.account!,
+          allowedNumbers: c.allowFrom,
+          chatCommandHandler: handleCommand,
+        );
+    }
+    return null;
+  }
+
+  /// Stops any running adapter for [type], rebuilds it from the current
+  /// config and starts it through the router's agent handler.
+  /// Returns true if an adapter is now running for [type].
+  Future<bool> reload(String type) async {
+    final router = _ref.read(channelRouterProvider);
+    await router.stopAdapter(type);
+    final adapter = await buildAdapter(type);
+    if (adapter == null) return false;
+    router.registerAdapter(adapter);
+    await router.startAdapter(type);
+    return true;
+  }
+
+  /// Stops and unregisters the adapter for [type] (full disconnect).
+  Future<void> disconnect(String type) async {
+    final router = _ref.read(channelRouterProvider);
+    await router.stopAdapter(type);
+  }
+}
+
+final channelControlProvider = Provider<ChannelControl>((ref) {
+  return ChannelControl(ref);
 });
 
 final skillsServiceProvider = Provider<SkillsService>((ref) {
@@ -1160,117 +1311,33 @@ final pluginServiceProvider = Provider<PluginService>((ref) {
 
 /// Starts channels and cron after app initialization.
 final channelStartupProvider = FutureProvider<void>((ref) async {
-  final config = ref.read(configManagerProvider).config;
   final router = ref.read(channelRouterProvider);
 
   // Bind the channel router to MessageTool (deferred to break circular dep).
   _pendingChannelRouterBinder?.call(router);
   _pendingChannelRouterBinder = null;
 
-  final pairingService = ref.read(pairingServiceProvider);
-  final commandHandler = ref.read(chatCommandHandlerProvider);
+  // Wire all configured channel adapters (shared builder with ChannelControl).
+  // On Android, channels run in the foreground-service isolate (IsolateRuntime).
+  if (!Platform.isAndroid) {
+    final control = ref.read(channelControlProvider);
+    for (final type in const [
+      'telegram',
+      'discord',
+      'whatsapp',
+      'slack',
+      'signal',
+    ]) {
+      final adapter = await control.buildAdapter(type);
+      if (adapter != null) router.registerAdapter(adapter);
+    }
 
-  // Wire Telegram adapter if configured
-  if (config.channels.telegram.enabled &&
-      config.channels.telegram.token != null &&
-      config.channels.telegram.token!.isNotEmpty) {
-    final telegram = TelegramChannelAdapter(
-      token: config.channels.telegram.token!,
-      allowedUserIds: config.channels.telegram.allowFrom,
-      dmPolicy: config.channels.telegram.dmPolicy,
-      pairingService: pairingService,
-      typingMode: config.agents.defaults.typingMode,
-      chatCommandHandler: (sessionKey, command) async {
-        final result = await commandHandler.handle(sessionKey, command);
-        return result.handled ? result.response : null;
-      },
-    );
-    router.registerAdapter(telegram);
+    // Start all registered adapters
+    await router.start();
   }
 
-  // Wire Discord adapter if configured
-  if (config.channels.discord.enabled &&
-      config.channels.discord.token != null &&
-      config.channels.discord.token!.isNotEmpty) {
-    final discord = DiscordChannelAdapter(
-      token: config.channels.discord.token!,
-      allowedUserIds: config.channels.discord.allowFrom,
-      dmPolicy: config.channels.discord.dmPolicy,
-      pairingService: pairingService,
-      chatCommandHandler: (sessionKey, command) async {
-        final result = await commandHandler.handle(sessionKey, command);
-        return result.handled ? result.response : null;
-      },
-    );
-    router.registerAdapter(discord);
-  }
-
-  // Wire WhatsApp adapter if configured
-  if (config.channels.whatsapp.enabled &&
-      await WhatsAppChannelAdapter.hasLinkedAuth(
-        config.channels.whatsapp.authDir,
-      )) {
-    final whatsapp = WhatsAppChannelAdapter(
-      authDir: config.channels.whatsapp.authDir,
-      allowedUserIds: config.channels.whatsapp.allowFrom,
-      dmPolicy: config.channels.whatsapp.dmPolicy,
-      selfChatMode: config.channels.whatsapp.selfChatMode,
-      pairingService: pairingService,
-      chatCommandHandler: (sessionKey, command) async {
-        final result = await commandHandler.handle(sessionKey, command);
-        return result.handled ? result.response : null;
-      },
-    );
-    router.registerAdapter(whatsapp);
-  } else if (config.channels.whatsapp.enabled) {
-    Logger('ChannelRouter').info(
-      'Skipping WhatsApp startup: channel enabled but no linked auth found yet',
-    );
-  }
-
-  // Wire Slack adapter if configured (Socket Mode — no public URL needed)
-  if (config.channels.slack.enabled &&
-      config.channels.slack.botToken != null &&
-      config.channels.slack.botToken!.isNotEmpty &&
-      config.channels.slack.appToken != null &&
-      config.channels.slack.appToken!.isNotEmpty) {
-    final slack = SlackChannelAdapter(
-      botToken: config.channels.slack.botToken!,
-      appToken: config.channels.slack.appToken!,
-      allowedUserIds: config.channels.slack.allowFrom,
-      chatCommandHandler: (sessionKey, command) async {
-        final result = await commandHandler.handle(sessionKey, command);
-        return result.handled ? result.response : null;
-      },
-    );
-    router.registerAdapter(slack);
-  }
-
-  // Wire Signal adapter (via signal-cli-rest-api proxy)
-  if (config.channels.signal.enabled &&
-      config.channels.signal.apiUrl != null &&
-      config.channels.signal.apiUrl!.isNotEmpty &&
-      config.channels.signal.account != null &&
-      config.channels.signal.account!.isNotEmpty) {
-    final signal = SignalChannelAdapter(
-      apiUrl: config.channels.signal.apiUrl!,
-      account: config.channels.signal.account!,
-      allowedNumbers: config.channels.signal.allowFrom,
-      chatCommandHandler: (sessionKey, command) async {
-        final result = await commandHandler.handle(sessionKey, command);
-        return result.handled ? result.response : null;
-      },
-    );
-    router.registerAdapter(signal);
-  }
-
-  // Start all registered adapters
-  await router.start();
-
-  // Ensure AgentLoop (and SubagentLoopProxy binding) is created before cron fires.
-  // agentLoopProvider is lazy; reading it here guarantees the proxy is bound
-  // before the first cron tick (which happens 60s after cronService.start()).
-  ref.read(agentLoopProvider);
+  // Ensure MessageQueue (and SubagentLoopProxy binding) is created before cron fires.
+  ref.read(messageQueueProvider);
 
   // Ensure deep link service is initialized before first message, so any
   // flutterclaw://callback URL that arrives early is not missed.
@@ -1280,11 +1347,14 @@ final channelStartupProvider = FutureProvider<void>((ref) async {
   // Initialize notification service eagerly so tool status notifications work
   await ref.read(notificationServiceProvider).initialize();
 
-  // Start cron service with event bus
-  final cronService = ref.read(cronServiceProvider);
   final eventBus = await ref.read(eventBusProvider.future);
-  cronService.eventBus = eventBus;
-  await cronService.start();
+
+  // Start cron service with event bus (Android cron runs in foreground isolate).
+  if (!Platform.isAndroid) {
+    final cronService = ref.read(cronServiceProvider);
+    cronService.eventBus = eventBus;
+    await cronService.start();
+  }
 
   // Start automation service with event bus
   final automationService = ref.read(automationServiceProvider);
@@ -1496,6 +1566,11 @@ final speechToTextServiceProvider = Provider<SpeechToTextService>((ref) {
   return SpeechToTextService();
 });
 
+/// Dynamic model discovery (OpenRouter, Ollama, OpenAI-compatible).
+final modelDiscoveryServiceProvider = Provider<ModelDiscoveryService>((ref) {
+  return ModelDiscoveryService();
+});
+
 /// Tracks which message text is currently being spoken by TTS (null = idle).
 /// Set to the message text when Speak is tapped; cleared when speech ends.
 final ttsSpeakingMsgProvider =
@@ -1527,6 +1602,9 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
   void cancelProcessing() {
     if (!_processing) return;
     _cancelled = true;
+    // Signal the agent loop so it aborts before the next LLM call / tool
+    // execution and closes the transcript cleanly (no orphaned tool calls).
+    ref.read(agentLoopProvider).requestCancel(_getSessionKey());
     _activeSubscription?.cancel();
     _activeSubscription = null;
     // Immediately mark the last assistant bubble as done so the UI updates.
@@ -2457,6 +2535,20 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
     await _streamAgentResponse(text, showUserMessage: true);
   }
 
+  /// Re-runs the agent for the current session without adding a new user
+  /// message. Used by the Retry button on error bubbles: the failed user turn
+  /// is already persisted in the transcript, so an empty message re-triggers
+  /// the loop with the existing context.
+  Future<void> retryLastTurn() async {
+    if (_processing) return;
+    final updated = List<ChatMessage>.from(state);
+    while (updated.isNotEmpty && !updated.last.isUser && updated.last.isError) {
+      updated.removeLast();
+    }
+    state = updated;
+    await _streamAgentResponse('', showUserMessage: false);
+  }
+
   Future<void> _streamAgentResponse(
     String text, {
     required bool showUserMessage,
@@ -2546,12 +2638,9 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
           if (event.toolResultChunk != null) {
             final chunk = event.toolResultChunk!;
             final isClear = chunk.startsWith('\x00CLEAR\x00');
-            print('[ChatNotifier] toolResultChunk len=${chunk.length} isClear=$isClear');
             final updated = List<ChatMessage>.from(state);
-            bool found = false;
             for (var i = updated.length - 1; i >= 0; i--) {
               if (updated[i].isToolStatus && updated[i].isStreaming == true) {
-                found = true;
                 final String newText;
                 if (isClear) {
                   // Replace accumulated text with the final authoritative output.
@@ -2559,29 +2648,23 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
                 } else {
                   newText = (updated[i].toolResultText ?? '') + chunk;
                 }
-                print('[ChatNotifier] → updating pill at i=$i, newText len=${newText.length}');
                 updated[i] = updated[i].copyWith(toolResultText: newText);
                 break;
               }
             }
-            if (!found) print('[ChatNotifier] ⚠ no streaming pill found for chunk!');
             state = updated;
           }
 
           if (event.toolResult != null) {
-            print('[ChatNotifier] toolResult len=${event.toolResult!.length}');
             final updated = List<ChatMessage>.from(state);
-            bool found = false;
             for (var i = updated.length - 1; i >= 0; i--) {
               if (updated[i].isToolStatus && updated[i].isStreaming == true) {
-                found = true;
                 // Prefer the toolResultText already set by a CLEAR chunk (the
                 // authoritative JSON from executeStream) over event.toolResult
                 // which may have been modified by truncation middleware.
                 // Fall back to event.toolResult if no CLEAR chunk arrived.
                 final existing = updated[i].toolResultText;
                 final useExisting = existing != null && existing.isNotEmpty;
-                print('[ChatNotifier] → marking pill at i=$i as done, useExisting=$useExisting existing=${existing?.length}');
                 updated[i] = updated[i].copyWith(
                   isStreaming: false,
                   toolResultText: useExisting ? existing : event.toolResult,
@@ -2589,7 +2672,6 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
                 break;
               }
             }
-            if (!found) print('[ChatNotifier] ⚠ no streaming pill found for toolResult!');
             state = updated;
           }
 
@@ -2669,6 +2751,13 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
           errorCtaUrl: errorMsg.errorCtaUrl,
           errorCtaLabel: errorMsg.errorCtaLabel,
         );
+        // Finalize any open tool status pills left streaming after errors.
+        for (var i = 0; i < updated.length; i++) {
+          final m = updated[i];
+          if (m.isToolStatus && m.isStreaming) {
+            updated[i] = m.copyWith(isStreaming: false);
+          }
+        }
       }
       state = updated;
     } finally {
@@ -2805,6 +2894,16 @@ class ChatNotifier extends Notifier<List<ChatMessage>> {
     state = [];
     _historyLoadedForAgent =
         _getSessionKey(); // prevent reloading cleared history
+  }
+
+  /// Starts a fresh conversation: resets the persisted session transcript
+  /// (same as the `/new` command) and clears the chat UI, so the UI and the
+  /// on-disk transcript stay in sync.
+  Future<void> startNewSession() async {
+    if (_processing) cancelProcessing();
+    final sessionKey = _getSessionKey();
+    await ref.read(sessionManagerProvider).reset(sessionKey);
+    clear();
   }
 
   /// Switch to any session by key. Clears the UI and loads that session's history.

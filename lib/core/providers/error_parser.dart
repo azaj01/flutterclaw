@@ -1,9 +1,22 @@
 /// Parses LLM provider errors into user-friendly messages.
 library;
 
+import 'dart:ui' show PlatformDispatcher, Locale;
+
 import 'package:dio/dio.dart';
 import 'package:flutterclaw/core/providers/openai_provider.dart'
     show LlmProviderException;
+import 'package:flutterclaw/generated/app_localizations.dart';
+
+/// Resolves localized strings outside the widget tree using the device
+/// locale, falling back to English for unsupported locales.
+AppLocalizations get _l10n {
+  try {
+    return lookupAppLocalizations(PlatformDispatcher.instance.locale);
+  } catch (_) {
+    return lookupAppLocalizations(const Locale('en'));
+  }
+}
 
 /// Classifies the failure reason so the router can decide whether to retry,
 /// back off, or fail immediately.  Mirrors OpenClaw's `FailoverReason`.
@@ -20,6 +33,8 @@ enum FailoverReason {
   billing,
   /// Permanent — model does not exist, don't retry.
   modelNotFound,
+  /// Permanent — bad request or payload too large, don't retry.
+  invalidRequest,
   /// Transient — request timed out, may succeed on retry.
   timeout,
   /// Transient — unknown error, can attempt retry.
@@ -52,7 +67,6 @@ class ParsedLlmError {
     FailoverReason.overloaded => true,
     FailoverReason.networkError => true,
     FailoverReason.timeout => true,
-    FailoverReason.unknown => true,
     _ => false,
   };
 
@@ -104,6 +118,9 @@ FailoverReason _classifyFailover(int? statusCode, String raw) {
       return FailoverReason.billing;
     case 404:
       return FailoverReason.modelNotFound;
+    case 400:
+    case 413:
+      return FailoverReason.invalidRequest;
     case 429:
       return FailoverReason.rateLimited;
     case 500:
@@ -136,15 +153,12 @@ FailoverReason _classifyFailover(int? statusCode, String raw) {
   // JSON bodies — long chat history, images/PDFs as base64, etc.
   // See https://openrouter.ai/docs/api/reference/errors-and-debugging
   if (statusCode == 413) {
+    final l10n = _l10n;
     return (
-      message:
-          'La peticion es demasiado grande para el proveedor (HTTP 413, "Payload Too Large"). '
-          'Suele ocurrir con historial muy largo, imagenes o archivos en base64. '
-          'Prueba en una conversacion nueva, envia menos adjuntos o acorta el contexto. '
-          'Documentacion: https://openrouter.ai/docs/api/reference/errors-and-debugging',
-      title: 'Solicitud demasiado grande',
+      message: l10n.llmErrorPayloadTooLarge,
+      title: l10n.llmErrorPayloadTooLargeTitle,
       ctaUrl: 'https://openrouter.ai/docs/api/reference/errors-and-debugging',
-      ctaLabel: 'Ver documentacion de errores',
+      ctaLabel: l10n.llmErrorViewDocs,
     );
   }
 
@@ -153,15 +167,12 @@ FailoverReason _classifyFailover(int? statusCode, String raw) {
       lower.contains('openrouter.ai/settings/privacy') ||
       (lower.contains('no endpoints available') &&
           (lower.contains('data policy') || lower.contains('policy')))) {
+    final l10n = _l10n;
     return (
-      message:
-          'OpenRouter no tiene endpoints disponibles para este modelo segun la politica '
-          'de privacidad y datos de tu cuenta. Abre https://openrouter.ai/settings/privacy '
-          'en el navegador (inicia sesion), revisa que proveedores y tipos de datos '
-          'permites, guarda los cambios e intenta de nuevo. Tambien puedes elegir otro modelo.',
-      title: 'Politica de datos (OpenRouter)',
+      message: l10n.llmErrorOpenRouterPrivacy,
+      title: l10n.llmErrorOpenRouterPrivacyTitle,
       ctaUrl: 'https://openrouter.ai/settings/privacy',
-      ctaLabel: 'Abrir ajustes de privacidad',
+      ctaLabel: l10n.llmErrorOpenPrivacySettings,
     );
   }
   return (
@@ -173,50 +184,39 @@ FailoverReason _classifyFailover(int? statusCode, String raw) {
 }
 
 String _friendlyMessage(int? statusCode, String raw) {
+  final l10n = _l10n;
   switch (statusCode) {
     case 401:
-      return 'La clave API es invalida o no fue proporcionada. '
-          'Revisa tu configuracion en Ajustes > Proveedores y modelos.';
+      return l10n.llmError401;
     case 402:
-      return 'Tu cuenta no tiene saldo suficiente o requiere un plan de pago '
-          'para usar este modelo. Revisa tu plan en el sitio del proveedor.';
+      return l10n.llmError402;
     case 403:
-      return 'No tienes permiso para acceder a este modelo. '
-          'Puede que necesites activarlo en tu cuenta del proveedor.';
+      return l10n.llmError403;
     case 404:
-      return 'El modelo solicitado no fue encontrado. '
-          'Verifica que el nombre del modelo sea correcto en Ajustes.';
+      return l10n.llmError404;
     case 413:
-      return 'La peticion supera el tamaño maximo permitido (HTTP 413). '
-          'Reduce el historial, adjuntos o imagenes en el mensaje.';
+      return l10n.llmError413;
     case 429:
-      return 'Demasiadas solicitudes. El proveedor ha limitado temporalmente '
-          'tu acceso. Espera un momento e intenta de nuevo.';
+      return l10n.llmError429;
     case 500:
-      return 'El servidor del proveedor tuvo un error interno. '
-          'Intenta de nuevo en unos minutos.';
+      return l10n.llmError500;
     case 502 || 503:
-      return 'El servicio del proveedor no esta disponible en este momento. '
-          'Intenta de nuevo en unos minutos.';
+      return l10n.llmError503;
     case 529:
-      return 'El proveedor esta sobrecargado. '
-          'Intenta de nuevo en unos minutos.';
+      return l10n.llmError529;
     case 400:
-      return 'El proveedor rechazo la solicitud (400): $raw';
+      return l10n.llmError400(raw);
     default:
       if (raw.contains('SocketException') ||
           raw.contains('Connection refused')) {
-        return 'No se pudo conectar al proveedor. '
-            'Revisa tu conexion a internet.';
+        return l10n.llmErrorNetwork;
       }
       if (raw.contains('timed out') || raw.contains('TimeoutException')) {
-        return 'La solicitud tardo demasiado y se agoto el tiempo. '
-            'Intenta de nuevo.';
+        return l10n.llmErrorTimeout;
       }
       if (statusCode != null) {
-        return 'El proveedor respondio con un error ($statusCode): $raw';
+        return l10n.llmErrorWithStatus(statusCode, raw);
       }
-      return 'Ocurrio un error al comunicarse con el proveedor. '
-          'Intenta de nuevo.';
+      return l10n.llmErrorUnknown;
   }
 }

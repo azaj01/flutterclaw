@@ -8,6 +8,7 @@ import "package:flutterclaw/channels/channel_interface.dart";
 import "package:flutterclaw/core/app_providers.dart";
 import "package:flutterclaw/l10n/l10n_extension.dart";
 import "package:flutterclaw/services/pairing_service.dart";
+import "package:flutterclaw/services/channel_validation.dart";
 import "package:flutterclaw/data/models/config.dart";
 import "package:flutterclaw/ui/widgets/security_method_card.dart";
 class DiscordConfigScreen extends ConsumerStatefulWidget {
@@ -91,6 +92,28 @@ class _DiscordConfigScreenState extends ConsumerState<DiscordConfigScreen> {
     }
   }
 
+  /// Validates [validationError] with the user; returns true to proceed.
+  Future<bool> _confirmSaveDespiteError(String validationError) async {
+    if (!mounted) return false;
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(ctx.l10n.tokenValidationFailed(validationError)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(ctx.l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(ctx.l10n.saveAnyway),
+          ),
+        ],
+      ),
+    );
+    return proceed == true;
+  }
+
   Future<void> _save() async {
     setState(() => _isLoading = true);
 
@@ -98,10 +121,17 @@ class _DiscordConfigScreenState extends ConsumerState<DiscordConfigScreen> {
       final configManager = ref.read(configManagerProvider);
       final token = _tokenCtl.text.trim();
 
+      if (token.isNotEmpty) {
+        final validationError = await ChannelValidation.discordToken(token);
+        if (validationError != null &&
+            !await _confirmSaveDespiteError(validationError)) {
+          return;
+        }
+      }
+
       configManager.update(
         configManager.config.copyWith(
-          channels: ChannelsConfig(
-            telegram: configManager.config.channels.telegram,
+          channels: configManager.config.channels.copyWith(
             discord: DiscordConfig(
               enabled: token.isNotEmpty,
               token: token.isNotEmpty ? token : null,
@@ -115,56 +145,58 @@ class _DiscordConfigScreenState extends ConsumerState<DiscordConfigScreen> {
       );
       await configManager.save();
 
+      final control = ref.read(channelControlProvider);
+      String? connectError;
       if (token.isNotEmpty) {
-        final router = ref.read(channelRouterProvider);
-        final pairingService = ref.read(pairingServiceProvider);
-        final cmdHandler = ref.read(chatCommandHandlerProvider);
-        router.unregisterAdapter('discord');
-
-        final adapter = DiscordChannelAdapter(
-          token: token,
-          allowedUserIds: _dmPolicy == 'allowlist'
-              ? _approvedDevices.keys.toList()
-              : [],
-          dmPolicy: _dmPolicy,
-          pairingService: pairingService,
-          chatCommandHandler: (sessionKey, command) async {
-            final result = await cmdHandler.handle(sessionKey, command);
-            return result.handled ? result.response : null;
-          },
-        );
-
-        router.registerAdapter(adapter);
-        final agentLoop = ref.read(agentLoopProvider);
-
-        await adapter.start((msg) async {
-          final response = await agentLoop.processMessage(
-            msg.sessionKey,
-            msg.text,
-            channelType: msg.channelType,
-            chatId: msg.chatId,
-            contentBlocks: msg.contentBlocks,
-            onIntermediateMessage: (text) => adapter.sendMessage(
-              OutgoingMessage(
-                channelType: msg.channelType,
-                chatId: msg.chatId,
-                text: text,
-              ),
-            ),
-          );
-          await adapter.sendMessage(
-            OutgoingMessage(
-              channelType: msg.channelType,
-              chatId: msg.chatId,
-              text: response.content,
-            ),
-          );
-        });
+        try {
+          await control.reload('discord');
+        } catch (e) {
+          connectError = e.toString();
+        }
+      } else {
+        await control.disconnect('discord');
       }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.l10n.discordConfigSaved)),
+          SnackBar(
+            content: Text(
+              connectError == null
+                  ? context.l10n.discordConfigSaved
+                  : context.l10n.channelConnectFailed(connectError),
+            ),
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _disconnect() async {
+    setState(() => _isLoading = true);
+    try {
+      final configManager = ref.read(configManagerProvider);
+      final current = configManager.config.channels.discord;
+      configManager.update(
+        configManager.config.copyWith(
+          channels: configManager.config.channels.copyWith(
+            discord: DiscordConfig(
+              enabled: false,
+              token: current.token,
+              allowFrom: current.allowFrom,
+              dmPolicy: current.dmPolicy,
+            ),
+          ),
+        ),
+      );
+      await configManager.save();
+      await ref.read(channelControlProvider).disconnect('discord');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.l10n.channelDisconnected)),
         );
         Navigator.pop(context);
       }
@@ -178,8 +210,21 @@ class _DiscordConfigScreenState extends ConsumerState<DiscordConfigScreen> {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
+    final channelEnabled =
+        ref.read(configManagerProvider).config.channels.discord.enabled;
+
     return Scaffold(
-      appBar: AppBar(title: Text(context.l10n.discordConfiguration)),
+      appBar: AppBar(
+        title: Text(context.l10n.discordConfiguration),
+        actions: [
+          if (channelEnabled)
+            TextButton.icon(
+              onPressed: _isLoading ? null : _disconnect,
+              icon: const Icon(Icons.logout),
+              label: Text(context.l10n.disconnect),
+            ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -301,6 +346,17 @@ class _DiscordConfigScreenState extends ConsumerState<DiscordConfigScreen> {
                         ),
                         textAlign: TextAlign.center,
                       ),
+                      if (_dmPolicy == 'allowlist') ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          context.l10n.allowlistEmptyWarning,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colors.error,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
                     ],
                   ),
                 ),

@@ -1,6 +1,8 @@
 /// Abstract router for LLM provider selection with failover support.
 library;
 
+import 'dart:async';
+
 import 'package:flutterclaw/core/providers/anthropic_provider.dart';
 import 'package:flutterclaw/core/providers/bedrock_provider.dart';
 import 'package:flutterclaw/core/providers/error_parser.dart';
@@ -10,6 +12,20 @@ import 'package:flutterclaw/data/models/config.dart';
 import 'package:logging/logging.dart';
 
 final _log = Logger('flutterclaw.provider_router');
+
+/// Emitted when a model is confirmed unavailable (404 / model_not_found).
+class ModelUnavailableEvent {
+  final String modelId;
+  final String modelName;
+  final String provider;
+  final DateTime timestamp;
+
+  ModelUnavailableEvent({
+    required this.modelId,
+    required this.modelName,
+    required this.provider,
+  }) : timestamp = DateTime.now();
+}
 
 abstract class ProviderRouter {
   Future<LlmResponse> chatCompletion(LlmRequest request);
@@ -59,6 +75,19 @@ class FailoverProviderRouter implements ProviderRouter {
   static const _maxRetries = 3;
   static const _baseDelayMs = 1000;
 
+  final _modelUnavailableCtl =
+      StreamController<ModelUnavailableEvent>.broadcast();
+
+  /// Stream of events when a model is confirmed unavailable.
+  Stream<ModelUnavailableEvent> get modelUnavailableEvents =>
+      _modelUnavailableCtl.stream;
+
+  final _retryCtl = StreamController<int>.broadcast();
+
+  /// Emits the attempt number (1-based) each time a transient error triggers
+  /// a silent retry, so the UI can surface "retrying…" feedback.
+  Stream<int> get retryEvents => _retryCtl.stream;
+
   FailoverProviderRouter({
     required this.primary,
     this.fallbacks = const [],
@@ -91,8 +120,21 @@ class FailoverProviderRouter implements ProviderRouter {
             'Transient error (${parsed.failoverReason.name}) on attempt '
             '${attempt + 1}/$_maxRetries — retrying in ${delayMs}ms',
           );
+          _retryCtl.add(attempt + 1);
           await Future<void>.delayed(Duration(milliseconds: delayMs));
         }
+      }
+    }
+
+    // Emit unavailability event if the failure was model-not-found.
+    if (lastError != null) {
+      final parsed = parseLlmError(lastError);
+      if (parsed.failoverReason == FailoverReason.modelNotFound) {
+        _modelUnavailableCtl.add(ModelUnavailableEvent(
+          modelId: request.model,
+          modelName: request.model,
+          provider: request.apiBase,
+        ));
       }
     }
 
@@ -102,8 +144,76 @@ class FailoverProviderRouter implements ProviderRouter {
   }
 
   @override
-  Stream<LlmStreamEvent> chatCompletionStream(LlmRequest request) {
-    return _resolveProvider(request).chatCompletionStream(request);
+  Stream<LlmStreamEvent> chatCompletionStream(LlmRequest request) async* {
+    Object? lastError;
+
+    for (var attempt = 0; attempt < _maxRetries; attempt++) {
+      var emitted = false;
+      try {
+        await for (final event
+            in _resolveProvider(request).chatCompletionStream(request)) {
+          emitted = true;
+          yield event;
+        }
+        return;
+      } catch (e) {
+        lastError = e;
+        // Once content has been emitted we cannot safely restart the stream
+        // (the consumer already saw partial output) — propagate the error.
+        if (emitted) rethrow;
+
+        final parsed = parseLlmError(e);
+        if (parsed.isPermanent) {
+          _log.warning(
+            'Permanent stream error (${parsed.failoverReason.name}), '
+            'skipping retry: ${parsed.friendlyMessage}',
+          );
+          rethrow;
+        }
+
+        if (attempt < _maxRetries - 1) {
+          final delayMs = _baseDelayMs * (1 << attempt); // 1s, 2s, 4s
+          _log.warning(
+            'Transient stream error (${parsed.failoverReason.name}) on '
+            'attempt ${attempt + 1}/$_maxRetries — retrying in ${delayMs}ms',
+          );
+          _retryCtl.add(attempt + 1);
+          await Future<void>.delayed(Duration(milliseconds: delayMs));
+        }
+      }
+    }
+
+    yield* _tryFallbackStream(request, lastError!);
+  }
+
+  Stream<LlmStreamEvent> _tryFallbackStream(
+    LlmRequest request,
+    Object primaryError,
+  ) async* {
+    final config = configManager.config;
+    if (config.modelList.length <= 1) throw primaryError;
+
+    for (var i = 1; i < config.modelList.length; i++) {
+      final fallbackModel = config.modelList[i];
+      _log.info('Trying fallback stream model: ${fallbackModel.modelName}');
+      final fallbackRequest = request.copyWith(
+        model: fallbackModel.model,
+        apiKey: config.resolveApiKey(fallbackModel),
+        apiBase: config.resolveApiBase(fallbackModel),
+      );
+      try {
+        await for (final event
+            in _resolveProvider(fallbackRequest).chatCompletionStream(
+          fallbackRequest,
+        )) {
+          yield event;
+        }
+        return;
+      } catch (e) {
+        _log.warning('Fallback stream ${fallbackModel.modelName} failed: $e');
+      }
+    }
+    throw primaryError;
   }
 
   Future<LlmResponse> _tryFallbacks(LlmRequest request, Object primaryError) async {

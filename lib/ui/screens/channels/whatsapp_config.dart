@@ -2,7 +2,6 @@
 import "dart:async";
 import "package:flutter/material.dart";
 import "package:flutterclaw/ui/theme/tokens.dart";
-import "package:flutter/services.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:flutterclaw/channels/whatsapp.dart";
 import "package:flutterclaw/channels/channel_interface.dart";
@@ -166,9 +165,7 @@ class _WhatsAppConfigScreenState extends ConsumerState<WhatsAppConfigScreen> {
     final currentConfig = configManager.config.channels.whatsapp;
     configManager.update(
       configManager.config.copyWith(
-        channels: ChannelsConfig(
-          telegram: configManager.config.channels.telegram,
-          discord: configManager.config.channels.discord,
+        channels: configManager.config.channels.copyWith(
           whatsapp: WhatsAppConfig(
             enabled: true,
             authDir: currentConfig.authDir,
@@ -282,9 +279,7 @@ class _WhatsAppConfigScreenState extends ConsumerState<WhatsAppConfigScreen> {
     final currentConfig = configManager.config.channels.whatsapp;
     configManager.update(
       configManager.config.copyWith(
-        channels: ChannelsConfig(
-          telegram: configManager.config.channels.telegram,
-          discord: configManager.config.channels.discord,
+        channels: configManager.config.channels.copyWith(
           whatsapp: WhatsAppConfig(
             enabled: false,
             authDir: currentConfig.authDir,
@@ -479,6 +474,17 @@ class _WhatsAppConfigScreenState extends ConsumerState<WhatsAppConfigScreen> {
                         ),
                         textAlign: TextAlign.center,
                       ),
+                      if (_dmPolicy == 'allowlist') ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          context.l10n.allowlistEmptyWarning,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colors.error,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
                     ],
                   ),
                 ),

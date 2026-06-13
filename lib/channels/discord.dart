@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
@@ -93,7 +94,8 @@ class DiscordChannelAdapter implements ChannelAdapter {
   bool _waitingForHello = true;
 
   Future<void> _connect({bool resume = false}) async {
-    for (var attempt = 0; attempt < _maxRetries && _running; attempt++) {
+    var attempt = 0;
+    while (_running) {
       try {
         final uri = Uri.parse(_gatewayUrl);
         final channel = WebSocketChannel.connect(uri);
@@ -113,10 +115,10 @@ class DiscordChannelAdapter implements ChannelAdapter {
         );
         return;
       } catch (e, st) {
-        _log.warning('Discord connect attempt ${attempt + 1} failed', e, st);
-        if (attempt < _maxRetries - 1) {
-          await Future<void>.delayed(Duration(seconds: 1 << attempt));
-        }
+        attempt++;
+        _log.warning('Discord connect attempt $attempt failed', e, st);
+        final delay = min(1 << min(attempt, 6), 60);
+        await Future<void>.delayed(Duration(seconds: delay));
       }
     }
   }

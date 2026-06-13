@@ -1992,4 +1992,178 @@ class AppLocalizationsNl extends AppLocalizations {
 
   @override
   String get cancelLink => 'Koppeling annuleren';
+
+  @override
+  String get searchModels => 'Search models';
+
+  @override
+  String get noModelsFound => 'No models match your search';
+
+  @override
+  String get useCustomIdHint =>
+      'You can use the search text as a custom model ID';
+
+  @override
+  String get useModelId => 'Use model';
+
+  @override
+  String get modelsAvailable => 'models available';
+
+  @override
+  String get modelUnavailableTitle => 'Model unavailable';
+
+  @override
+  String modelUnavailableMessage(String model) {
+    return '$model is no longer available. Change your model in Settings.';
+  }
+
+  @override
+  String get changeModel => 'Change model';
+
+  @override
+  String get credentialLabel => 'Label (optional)';
+
+  @override
+  String get credentialLabelHint => 'e.g. work, personal';
+
+  @override
+  String get selectCredential => 'Select API key';
+
+  @override
+  String tokenValidationFailed(String error) {
+    return 'Validation failed: $error';
+  }
+
+  @override
+  String get saveAnyway => 'Save anyway';
+
+  @override
+  String get channelDisconnected => 'Channel disconnected';
+
+  @override
+  String channelConnectFailed(String error) {
+    return 'Saved, but the channel failed to connect: $error';
+  }
+
+  @override
+  String channelErrorLabel(String error) {
+    return 'Error: $error';
+  }
+
+  @override
+  String get newConversationTitle => 'Start new conversation?';
+
+  @override
+  String get newConversationMessage =>
+      'This will end the current session and start a fresh one. The previous transcript is kept on disk.';
+
+  @override
+  String get startNewConversation => 'Start new';
+
+  @override
+  String get retryingRequest => 'Retrying...';
+
+  @override
+  String get contextCompacted => 'Conversation compacted to free up context';
+
+  @override
+  String get compactionFailed => 'Could not compact this conversation';
+
+  @override
+  String get allowedUsersTitle => 'Allowed users';
+
+  @override
+  String get allowlistEmptyWarning =>
+      'Allowlist is empty — anyone who messages this bot can talk to the agent.';
+
+  @override
+  String get allowFromAddHint => 'User ID or phone number';
+
+  @override
+  String get llmErrorPayloadTooLarge =>
+      'The request is too large for the provider (HTTP 413, \"Payload Too Large\"). This usually happens with very long history, images or base64 attachments. Try a new conversation, send fewer attachments or shorten the context.';
+
+  @override
+  String get llmErrorPayloadTooLargeTitle => 'Request too large';
+
+  @override
+  String get llmErrorViewDocs => 'View error documentation';
+
+  @override
+  String get llmErrorOpenRouterPrivacy =>
+      'OpenRouter has no endpoints available for this model under your account\'s data and privacy policy. Open https://openrouter.ai/settings/privacy in a browser (sign in), review which providers and data types you allow, save the changes and try again. You can also pick another model.';
+
+  @override
+  String get llmErrorOpenRouterPrivacyTitle => 'Data policy (OpenRouter)';
+
+  @override
+  String get llmErrorOpenPrivacySettings => 'Open privacy settings';
+
+  @override
+  String get llmError401 =>
+      'The API key is invalid or missing. Check your configuration in Settings > Providers and models.';
+
+  @override
+  String get llmError402 =>
+      'Your account has insufficient balance or requires a paid plan to use this model. Check your plan on the provider\'s site.';
+
+  @override
+  String get llmError403 =>
+      'You don\'t have permission to access this model. You may need to enable it in your provider account.';
+
+  @override
+  String get llmError404 =>
+      'The requested model was not found. Verify the model name is correct in Settings.';
+
+  @override
+  String get llmError413 =>
+      'The request exceeds the maximum allowed size (HTTP 413). Reduce the history, attachments or images in the message.';
+
+  @override
+  String get llmError429 =>
+      'Too many requests. The provider has temporarily limited your access. Wait a moment and try again.';
+
+  @override
+  String get llmError500 =>
+      'The provider\'s server had an internal error. Try again in a few minutes.';
+
+  @override
+  String get llmError503 =>
+      'The provider\'s service is unavailable right now. Try again in a few minutes.';
+
+  @override
+  String get llmError529 =>
+      'The provider is overloaded. Try again in a few minutes.';
+
+  @override
+  String llmError400(String raw) {
+    return 'The provider rejected the request (400): $raw';
+  }
+
+  @override
+  String get llmErrorNetwork =>
+      'Could not connect to the provider. Check your internet connection.';
+
+  @override
+  String get llmErrorTimeout =>
+      'The request took too long and timed out. Try again.';
+
+  @override
+  String llmErrorWithStatus(int statusCode, String raw) {
+    return 'The provider responded with an error ($statusCode): $raw';
+  }
+
+  @override
+  String get llmErrorUnknown =>
+      'An error occurred while communicating with the provider. Try again.';
+
+  @override
+  String get discoverModels => 'Discover models';
+
+  @override
+  String get refreshModels => 'Refresh model list';
+
+  @override
+  String get modelNotInProviderList =>
+      'This model was not found in the provider\'s model list. It may still work if the ID is correct.';
 }

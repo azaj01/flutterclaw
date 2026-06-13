@@ -25,6 +25,7 @@ class ChannelRouter {
   final _log = Logger('ChannelRouter');
   final Map<String, ChannelAdapter> _adapters = {};
   final Map<String, Queue<OutgoingMessage>> _pendingQueues = {};
+  final Map<String, String> _lastErrors = {};
   final int maxQueueSize;
 
   /// Called for each incoming message. Set this to your agent's handler.
@@ -41,6 +42,12 @@ class ChannelRouter {
   /// All registered adapters (for status display).
   List<ChannelAdapter> get adapters => _adapters.values.toList();
 
+  /// Returns the registered adapter for [type], if any.
+  ChannelAdapter? adapterFor(String type) => _adapters[type];
+
+  /// Last startup/runtime error per channel type (for status display).
+  String? lastErrorFor(String type) => _lastErrors[type];
+
   /// Register a channel adapter.
   void registerAdapter(ChannelAdapter adapter) {
     if (_adapters.containsKey(adapter.type)) {
@@ -53,6 +60,41 @@ class ChannelRouter {
   void unregisterAdapter(String type) {
     _adapters.remove(type);
     _pendingQueues.remove(type);
+    _lastErrors.remove(type);
+  }
+
+  /// Start a single registered adapter using the router's incoming-message
+  /// handler (transcription + agent + offline queue). Used for hot-connecting
+  /// a channel after its configuration changed.
+  Future<void> startAdapter(String type) async {
+    final adapter = _adapters[type];
+    if (adapter == null) {
+      _log.warning('startAdapter: no adapter registered for $type');
+      return;
+    }
+    try {
+      await adapter.start(_handleIncoming);
+      _lastErrors.remove(type);
+      _log.info('Started channel $type');
+    } catch (e, st) {
+      _lastErrors[type] = e.toString();
+      _log.severe('Failed to start channel $type', e, st);
+      rethrow;
+    }
+  }
+
+  /// Stop and unregister a single adapter (full disconnect of a channel).
+  Future<void> stopAdapter(String type) async {
+    final adapter = _adapters.remove(type);
+    _pendingQueues.remove(type);
+    _lastErrors.remove(type);
+    if (adapter == null) return;
+    try {
+      await adapter.stop();
+      _log.info('Stopped channel $type');
+    } catch (e, st) {
+      _log.warning('Error stopping channel $type', e, st);
+    }
   }
 
   /// Get session key for isolation (channel + chatId).
@@ -68,8 +110,10 @@ class ChannelRouter {
     for (final adapter in _adapters.values) {
       try {
         await adapter.start(_handleIncoming);
+        _lastErrors.remove(adapter.type);
         _log.info('Started channel ${adapter.type}');
       } catch (e, st) {
+        _lastErrors[adapter.type] = e.toString();
         _log.severe('Failed to start channel ${adapter.type}', e, st);
       }
     }

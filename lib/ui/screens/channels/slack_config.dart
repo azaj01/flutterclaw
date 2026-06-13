@@ -7,7 +7,9 @@ import "package:flutterclaw/channels/slack.dart";
 import "package:flutterclaw/core/app_providers.dart";
 import "package:flutterclaw/l10n/l10n_extension.dart";
 import "package:flutterclaw/services/pairing_service.dart";
+import "package:flutterclaw/services/channel_validation.dart";
 import "package:flutterclaw/data/models/config.dart";
+import "package:flutterclaw/ui/widgets/allowlist_editor.dart";
 class SlackConfigScreen extends ConsumerStatefulWidget {
   const SlackConfigScreen({super.key});
   @override
@@ -17,6 +19,7 @@ class SlackConfigScreen extends ConsumerStatefulWidget {
 class _SlackConfigScreenState extends ConsumerState<SlackConfigScreen> {
   late TextEditingController _botTokenCtrl;
   late TextEditingController _appTokenCtrl;
+  late List<String> _allowFrom;
   bool _saving = false;
 
   @override
@@ -25,6 +28,7 @@ class _SlackConfigScreenState extends ConsumerState<SlackConfigScreen> {
     final slack = ref.read(configManagerProvider).config.channels.slack;
     _botTokenCtrl = TextEditingController(text: slack.botToken ?? '');
     _appTokenCtrl = TextEditingController(text: slack.appToken ?? '');
+    _allowFrom = List.of(slack.allowFrom);
   }
 
   @override
@@ -32,6 +36,28 @@ class _SlackConfigScreenState extends ConsumerState<SlackConfigScreen> {
     _botTokenCtrl.dispose();
     _appTokenCtrl.dispose();
     super.dispose();
+  }
+
+  /// Validates [validationError] with the user; returns true to proceed.
+  Future<bool> _confirmSaveDespiteError(String validationError) async {
+    if (!mounted) return false;
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(ctx.l10n.tokenValidationFailed(validationError)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(ctx.l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(ctx.l10n.saveAnyway),
+          ),
+        ],
+      ),
+    );
+    return proceed == true;
   }
 
   Future<void> _save() async {
@@ -45,26 +71,42 @@ class _SlackConfigScreenState extends ConsumerState<SlackConfigScreen> {
     }
     setState(() => _saving = true);
     try {
+      final validationError =
+          await ChannelValidation.slackTokens(botToken, appToken);
+      if (validationError != null &&
+          !await _confirmSaveDespiteError(validationError)) {
+        return;
+      }
+
       final configManager = ref.read(configManagerProvider);
       final config = configManager.config;
       configManager.update(config.copyWith(
-        channels: ChannelsConfig(
-          telegram: config.channels.telegram,
-          discord: config.channels.discord,
-          whatsapp: config.channels.whatsapp,
+        channels: config.channels.copyWith(
           slack: SlackConfig(
             enabled: true,
             botToken: botToken,
             appToken: appToken,
-            allowFrom: config.channels.slack.allowFrom,
+            allowFrom: _allowFrom,
           ),
         ),
       ));
       await configManager.save();
+
+      String? connectError;
+      try {
+        await ref.read(channelControlProvider).reload('slack');
+      } catch (e) {
+        connectError = e.toString();
+      }
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(context.l10n.slackSavedRestart),
+          content: Text(
+            connectError == null
+                ? context.l10n.slackConfigSaved
+                : context.l10n.channelConnectFailed(connectError),
+          ),
         ),
       );
       Navigator.pop(context);
@@ -77,11 +119,53 @@ class _SlackConfigScreenState extends ConsumerState<SlackConfigScreen> {
     }
   }
 
+  Future<void> _disconnect() async {
+    setState(() => _saving = true);
+    try {
+      final configManager = ref.read(configManagerProvider);
+      final current = configManager.config.channels.slack;
+      configManager.update(configManager.config.copyWith(
+        channels: configManager.config.channels.copyWith(
+          slack: SlackConfig(
+            enabled: false,
+            botToken: current.botToken,
+            appToken: current.appToken,
+            allowFrom: current.allowFrom,
+          ),
+        ),
+      ));
+      await configManager.save();
+      await ref.read(channelControlProvider).disconnect('slack');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.l10n.channelDisconnected)),
+        );
+        Navigator.pop(context);
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final channelEnabled =
+        ref.read(configManagerProvider).config.channels.slack.enabled;
+
     return Scaffold(
-      appBar: AppBar(title: Text(context.l10n.slackConfiguration)),
+      appBar: AppBar(
+        title: Text(context.l10n.slackConfiguration),
+        actions: [
+          if (channelEnabled)
+            TextButton.icon(
+              onPressed: _saving ? null : _disconnect,
+              icon: const Icon(Icons.logout),
+              label: Text(context.l10n.disconnect),
+            ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -122,6 +206,12 @@ class _SlackConfigScreenState extends ConsumerState<SlackConfigScreen> {
               border: const OutlineInputBorder(),
               prefixIcon: const Icon(Icons.vpn_key_outlined),
             ),
+          ),
+          const SizedBox(height: 24),
+          AllowlistEditor(
+            entries: _allowFrom,
+            onChanged: (entries) => setState(() => _allowFrom = entries),
+            hintText: 'U0123456789',
           ),
           const SizedBox(height: 24),
           FilledButton.icon(

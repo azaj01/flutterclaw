@@ -314,7 +314,7 @@ abstract class AppLocalizations {
   /// **'Validate Key'**
   String get validateKey;
 
-  /// Validating status
+  /// Progress label while validating credentials
   ///
   /// In en, this message translates to:
   /// **'Validating...'**
@@ -3335,13 +3335,13 @@ abstract class AppLocalizations {
   /// Slack config saved snackbar
   ///
   /// In en, this message translates to:
-  /// **'Slack saved — restart the gateway to connect'**
+  /// **'Slack configuration saved'**
   String get slackConfigSaved;
 
   /// Signal config saved snackbar
   ///
   /// In en, this message translates to:
-  /// **'Signal saved — restart gateway to connect'**
+  /// **'Signal configuration saved'**
   String get signalConfigSaved;
 
   /// ID display prefix
@@ -3589,6 +3589,294 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Cancel Link'**
   String get cancelLink;
+
+  /// OpenRouter model search field label
+  ///
+  /// In en, this message translates to:
+  /// **'Search models'**
+  String get searchModels;
+
+  /// Empty state when OpenRouter model search has no results
+  ///
+  /// In en, this message translates to:
+  /// **'No models match your search'**
+  String get noModelsFound;
+
+  /// Hint below empty search results
+  ///
+  /// In en, this message translates to:
+  /// **'You can use the search text as a custom model ID'**
+  String get useCustomIdHint;
+
+  /// Button to use custom model ID from search text
+  ///
+  /// In en, this message translates to:
+  /// **'Use model'**
+  String get useModelId;
+
+  /// Suffix for model count e.g. '356 models available'
+  ///
+  /// In en, this message translates to:
+  /// **'models available'**
+  String get modelsAvailable;
+
+  /// Banner title when a model is no longer available
+  ///
+  /// In en, this message translates to:
+  /// **'Model unavailable'**
+  String get modelUnavailableTitle;
+
+  /// Banner message when model fails with not found
+  ///
+  /// In en, this message translates to:
+  /// **'{model} is no longer available. Change your model in Settings.'**
+  String modelUnavailableMessage(String model);
+
+  /// Action button on model unavailable banner
+  ///
+  /// In en, this message translates to:
+  /// **'Change model'**
+  String get changeModel;
+
+  /// Label field for named credentials
+  ///
+  /// In en, this message translates to:
+  /// **'Label (optional)'**
+  String get credentialLabel;
+
+  /// Hint for credential label field
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. work, personal'**
+  String get credentialLabelHint;
+
+  /// Dropdown label for choosing which credential to use
+  ///
+  /// In en, this message translates to:
+  /// **'Select API key'**
+  String get selectCredential;
+
+  /// Shown when channel credential validation fails
+  ///
+  /// In en, this message translates to:
+  /// **'Validation failed: {error}'**
+  String tokenValidationFailed(String error);
+
+  /// Button to save config despite failed validation
+  ///
+  /// In en, this message translates to:
+  /// **'Save anyway'**
+  String get saveAnyway;
+
+  /// Snackbar after disconnecting a channel
+  ///
+  /// In en, this message translates to:
+  /// **'Channel disconnected'**
+  String get channelDisconnected;
+
+  /// Snackbar when channel config saved but adapter start failed
+  ///
+  /// In en, this message translates to:
+  /// **'Saved, but the channel failed to connect: {error}'**
+  String channelConnectFailed(String error);
+
+  /// Channel list subtitle showing last connection error
+  ///
+  /// In en, this message translates to:
+  /// **'Error: {error}'**
+  String channelErrorLabel(String error);
+
+  /// Dialog title for new conversation confirmation
+  ///
+  /// In en, this message translates to:
+  /// **'Start new conversation?'**
+  String get newConversationTitle;
+
+  /// Dialog body for new conversation confirmation
+  ///
+  /// In en, this message translates to:
+  /// **'This will end the current session and start a fresh one. The previous transcript is kept on disk.'**
+  String get newConversationMessage;
+
+  /// Confirm button for new conversation dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Start new'**
+  String get startNewConversation;
+
+  /// Status shown while a failed LLM request is retried
+  ///
+  /// In en, this message translates to:
+  /// **'Retrying...'**
+  String get retryingRequest;
+
+  /// Snackbar/notice when auto-compaction ran
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation compacted to free up context'**
+  String get contextCompacted;
+
+  /// Snackbar when manual compaction fails (e.g. not enough history)
+  ///
+  /// In en, this message translates to:
+  /// **'Could not compact this conversation'**
+  String get compactionFailed;
+
+  /// Channel allowlist section title
+  ///
+  /// In en, this message translates to:
+  /// **'Allowed users'**
+  String get allowedUsersTitle;
+
+  /// Warning shown when a channel allowlist is empty (open access)
+  ///
+  /// In en, this message translates to:
+  /// **'Allowlist is empty — anyone who messages this bot can talk to the agent.'**
+  String get allowlistEmptyWarning;
+
+  /// Hint for the allowlist add field
+  ///
+  /// In en, this message translates to:
+  /// **'User ID or phone number'**
+  String get allowFromAddHint;
+
+  /// LLM error: HTTP 413
+  ///
+  /// In en, this message translates to:
+  /// **'The request is too large for the provider (HTTP 413, \"Payload Too Large\"). This usually happens with very long history, images or base64 attachments. Try a new conversation, send fewer attachments or shorten the context.'**
+  String get llmErrorPayloadTooLarge;
+
+  /// LLM error title: HTTP 413
+  ///
+  /// In en, this message translates to:
+  /// **'Request too large'**
+  String get llmErrorPayloadTooLargeTitle;
+
+  /// CTA label for provider error docs
+  ///
+  /// In en, this message translates to:
+  /// **'View error documentation'**
+  String get llmErrorViewDocs;
+
+  /// LLM error: OpenRouter data policy
+  ///
+  /// In en, this message translates to:
+  /// **'OpenRouter has no endpoints available for this model under your account\'s data and privacy policy. Open https://openrouter.ai/settings/privacy in a browser (sign in), review which providers and data types you allow, save the changes and try again. You can also pick another model.'**
+  String get llmErrorOpenRouterPrivacy;
+
+  /// LLM error title: OpenRouter data policy
+  ///
+  /// In en, this message translates to:
+  /// **'Data policy (OpenRouter)'**
+  String get llmErrorOpenRouterPrivacyTitle;
+
+  /// CTA label for OpenRouter privacy settings
+  ///
+  /// In en, this message translates to:
+  /// **'Open privacy settings'**
+  String get llmErrorOpenPrivacySettings;
+
+  /// LLM error: HTTP 401
+  ///
+  /// In en, this message translates to:
+  /// **'The API key is invalid or missing. Check your configuration in Settings > Providers and models.'**
+  String get llmError401;
+
+  /// LLM error: HTTP 402
+  ///
+  /// In en, this message translates to:
+  /// **'Your account has insufficient balance or requires a paid plan to use this model. Check your plan on the provider\'s site.'**
+  String get llmError402;
+
+  /// LLM error: HTTP 403
+  ///
+  /// In en, this message translates to:
+  /// **'You don\'t have permission to access this model. You may need to enable it in your provider account.'**
+  String get llmError403;
+
+  /// LLM error: HTTP 404
+  ///
+  /// In en, this message translates to:
+  /// **'The requested model was not found. Verify the model name is correct in Settings.'**
+  String get llmError404;
+
+  /// LLM error: HTTP 413 short
+  ///
+  /// In en, this message translates to:
+  /// **'The request exceeds the maximum allowed size (HTTP 413). Reduce the history, attachments or images in the message.'**
+  String get llmError413;
+
+  /// LLM error: HTTP 429
+  ///
+  /// In en, this message translates to:
+  /// **'Too many requests. The provider has temporarily limited your access. Wait a moment and try again.'**
+  String get llmError429;
+
+  /// LLM error: HTTP 500
+  ///
+  /// In en, this message translates to:
+  /// **'The provider\'s server had an internal error. Try again in a few minutes.'**
+  String get llmError500;
+
+  /// LLM error: HTTP 502/503
+  ///
+  /// In en, this message translates to:
+  /// **'The provider\'s service is unavailable right now. Try again in a few minutes.'**
+  String get llmError503;
+
+  /// LLM error: HTTP 529
+  ///
+  /// In en, this message translates to:
+  /// **'The provider is overloaded. Try again in a few minutes.'**
+  String get llmError529;
+
+  /// LLM error: HTTP 400
+  ///
+  /// In en, this message translates to:
+  /// **'The provider rejected the request (400): {raw}'**
+  String llmError400(String raw);
+
+  /// LLM error: network failure
+  ///
+  /// In en, this message translates to:
+  /// **'Could not connect to the provider. Check your internet connection.'**
+  String get llmErrorNetwork;
+
+  /// LLM error: timeout
+  ///
+  /// In en, this message translates to:
+  /// **'The request took too long and timed out. Try again.'**
+  String get llmErrorTimeout;
+
+  /// LLM error: generic with status code
+  ///
+  /// In en, this message translates to:
+  /// **'The provider responded with an error ({statusCode}): {raw}'**
+  String llmErrorWithStatus(int statusCode, String raw);
+
+  /// LLM error: unknown
+  ///
+  /// In en, this message translates to:
+  /// **'An error occurred while communicating with the provider. Try again.'**
+  String get llmErrorUnknown;
+
+  /// Button to fetch available models from the provider API
+  ///
+  /// In en, this message translates to:
+  /// **'Discover models'**
+  String get discoverModels;
+
+  /// Tooltip for refreshing cached model list
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh model list'**
+  String get refreshModels;
+
+  /// Warning when added model ID is not in the discovered list
+  ///
+  /// In en, this message translates to:
+  /// **'This model was not found in the provider\'s model list. It may still work if the ID is correct.'**
+  String get modelNotInProviderList;
 }
 
 class _AppLocalizationsDelegate

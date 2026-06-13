@@ -167,12 +167,46 @@ class SessionSwitcherChip extends ConsumerWidget {
                               ),
                     ),
                     subtitle: Text(subtitle),
-                    trailing: isActive
-                        ? Icon(
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isActive)
+                          Icon(
                             Icons.check_circle,
                             color: Theme.of(context).colorScheme.primary,
-                          )
-                        : null,
+                          ),
+                        PopupMenuButton<String>(
+                          onSelected: (action) => _handleSessionAction(
+                              ctx, ref, session, isActive, action),
+                          itemBuilder: (_) => [
+                            PopupMenuItem(
+                              value: 'rename',
+                              child: ListTile(
+                                leading: const Icon(Icons.edit_outlined),
+                                title: Text(context.l10n.renameAction),
+                                dense: true,
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: 'compact',
+                              child: ListTile(
+                                leading: const Icon(Icons.compress),
+                                title: Text(context.l10n.compact),
+                                dense: true,
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: 'reset',
+                              child: ListTile(
+                                leading: const Icon(Icons.delete_outline),
+                                title: Text(context.l10n.reset),
+                                dense: true,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                     onTap: () async {
                       Navigator.pop(ctx);
                       if (!isActive) {
@@ -191,6 +225,69 @@ class SessionSwitcherChip extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  /// Handles rename/compact/reset from the session picker menu.
+  Future<void> _handleSessionAction(
+    BuildContext sheetCtx,
+    WidgetRef ref,
+    SessionMeta session,
+    bool isActive,
+    String action,
+  ) async {
+    final sessionManager = ref.read(sessionManagerProvider);
+    final l10n = sheetCtx.l10n;
+    final messenger = ScaffoldMessenger.of(sheetCtx);
+
+    switch (action) {
+      case 'rename':
+        final controller =
+            TextEditingController(text: session.displayName ?? '');
+        final name = await showDialog<String>(
+          context: sheetCtx,
+          builder: (dCtx) => AlertDialog(
+            title: Text(l10n.renameSession),
+            content: TextField(
+              controller: controller,
+              autofocus: true,
+              decoration: InputDecoration(hintText: l10n.myConversationName),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dCtx),
+                child: Text(l10n.cancel),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dCtx, controller.text),
+                child: Text(l10n.save),
+              ),
+            ],
+          ),
+        );
+        if (name != null) {
+          await sessionManager.renameSession(session.key, name);
+        }
+        if (sheetCtx.mounted) Navigator.pop(sheetCtx);
+      case 'compact':
+        if (sheetCtx.mounted) Navigator.pop(sheetCtx);
+        final summary =
+            await ref.read(agentLoopProvider).compactSession(session.key);
+        messenger.showSnackBar(SnackBar(
+          content: Text(
+              summary != null ? l10n.contextCompacted : l10n.compactionFailed),
+        ));
+        // Refresh the chat UI if the active session was compacted.
+        if (summary != null && isActive) {
+          await ref.read(chatProvider.notifier).switchToSession(session.key);
+        }
+      case 'reset':
+        if (sheetCtx.mounted) Navigator.pop(sheetCtx);
+        if (isActive) {
+          await ref.read(chatProvider.notifier).startNewSession();
+        } else {
+          await sessionManager.reset(session.key);
+        }
+    }
   }
 
   static String _sessionLabel(

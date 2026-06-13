@@ -1,13 +1,14 @@
 // ignore_for_file: unused_import
 import "package:flutter/material.dart";
 import "package:flutterclaw/ui/theme/tokens.dart";
-import "package:flutter/services.dart";
 import "package:flutter_riverpod/flutter_riverpod.dart";
 import "package:flutterclaw/channels/signal.dart";
 import "package:flutterclaw/core/app_providers.dart";
 import "package:flutterclaw/l10n/l10n_extension.dart";
 import "package:flutterclaw/services/pairing_service.dart";
+import "package:flutterclaw/services/channel_validation.dart";
 import "package:flutterclaw/data/models/config.dart";
+import "package:flutterclaw/ui/widgets/allowlist_editor.dart";
 class SignalConfigScreen extends ConsumerStatefulWidget {
   const SignalConfigScreen({super.key});
   @override
@@ -17,6 +18,7 @@ class SignalConfigScreen extends ConsumerStatefulWidget {
 class _SignalConfigScreenState extends ConsumerState<SignalConfigScreen> {
   late TextEditingController _apiUrlCtrl;
   late TextEditingController _accountCtrl;
+  late List<String> _allowFrom;
   bool _saving = false;
 
   @override
@@ -25,6 +27,7 @@ class _SignalConfigScreenState extends ConsumerState<SignalConfigScreen> {
     final signal = ref.read(configManagerProvider).config.channels.signal;
     _apiUrlCtrl  = TextEditingController(text: signal.apiUrl ?? '');
     _accountCtrl = TextEditingController(text: signal.account ?? '');
+    _allowFrom = List.of(signal.allowFrom);
   }
 
   @override
@@ -45,26 +48,42 @@ class _SignalConfigScreenState extends ConsumerState<SignalConfigScreen> {
     }
     setState(() => _saving = true);
     try {
+      final validationError = await ChannelValidation.signalApi(apiUrl);
+      if (validationError != null &&
+          !await _confirmSaveDespiteError(validationError)) {
+        return;
+      }
+
       final configManager = ref.read(configManagerProvider);
       final config = configManager.config;
       configManager.update(config.copyWith(
-        channels: ChannelsConfig(
-          telegram: config.channels.telegram,
-          discord:  config.channels.discord,
-          whatsapp: config.channels.whatsapp,
-          slack:    config.channels.slack,
+        channels: config.channels.copyWith(
           signal: SignalConfig(
             enabled:   true,
             apiUrl:    apiUrl,
             account:   account,
-            allowFrom: config.channels.signal.allowFrom,
+            allowFrom: _allowFrom,
           ),
         ),
       ));
       await configManager.save();
+
+      String? connectError;
+      try {
+        await ref.read(channelControlProvider).reload('signal');
+      } catch (e) {
+        connectError = e.toString();
+      }
+
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.l10n.signalConfigSaved)),
+        SnackBar(
+          content: Text(
+            connectError == null
+                ? context.l10n.signalConfigSaved
+                : context.l10n.channelConnectFailed(connectError),
+          ),
+        ),
       );
       Navigator.pop(context);
     } catch (e) {
@@ -76,11 +95,75 @@ class _SignalConfigScreenState extends ConsumerState<SignalConfigScreen> {
     }
   }
 
+  /// Validates [validationError] with the user; returns true to proceed.
+  Future<bool> _confirmSaveDespiteError(String validationError) async {
+    if (!mounted) return false;
+    final proceed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(ctx.l10n.tokenValidationFailed(validationError)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(ctx.l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(ctx.l10n.saveAnyway),
+          ),
+        ],
+      ),
+    );
+    return proceed == true;
+  }
+
+  Future<void> _disconnect() async {
+    setState(() => _saving = true);
+    try {
+      final configManager = ref.read(configManagerProvider);
+      final current = configManager.config.channels.signal;
+      configManager.update(configManager.config.copyWith(
+        channels: configManager.config.channels.copyWith(
+          signal: SignalConfig(
+            enabled: false,
+            apiUrl: current.apiUrl,
+            account: current.account,
+            allowFrom: current.allowFrom,
+          ),
+        ),
+      ));
+      await configManager.save();
+      await ref.read(channelControlProvider).disconnect('signal');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.l10n.channelDisconnected)),
+        );
+        Navigator.pop(context);
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final channelEnabled =
+        ref.read(configManagerProvider).config.channels.signal.enabled;
+
     return Scaffold(
-      appBar: AppBar(title: Text(context.l10n.signalConfiguration)),
+      appBar: AppBar(
+        title: Text(context.l10n.signalConfiguration),
+        actions: [
+          if (channelEnabled)
+            TextButton.icon(
+              onPressed: _saving ? null : _disconnect,
+              icon: const Icon(Icons.logout),
+              label: Text(context.l10n.disconnect),
+            ),
+        ],
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -123,6 +206,12 @@ class _SignalConfigScreenState extends ConsumerState<SignalConfigScreen> {
               prefixIcon: const Icon(Icons.phone),
             ),
             keyboardType: TextInputType.phone,
+          ),
+          const SizedBox(height: 24),
+          AllowlistEditor(
+            entries: _allowFrom,
+            onChanged: (entries) => setState(() => _allowFrom = entries),
+            hintText: '+12025551234',
           ),
           const SizedBox(height: 24),
           FilledButton.icon(

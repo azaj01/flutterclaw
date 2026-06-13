@@ -53,6 +53,7 @@ class SlackChannelAdapter implements ChannelAdapter {
   MessageHandler? _handler;
   bool _running = false;
   WebSocketChannel? _ws;
+  StreamSubscription<dynamic>? _wsSub;
   Timer? _reconnectTimer;
   String? _botUserId;
 
@@ -76,6 +77,8 @@ class SlackChannelAdapter implements ChannelAdapter {
     _running = false;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
+    await _wsSub?.cancel();
+    _wsSub = null;
     _ws?.sink.close();
     _ws = null;
     _handler = null;
@@ -119,7 +122,8 @@ class SlackChannelAdapter implements ChannelAdapter {
       _ws = WebSocketChannel.connect(Uri.parse(wssUrl));
       _log.info('Slack Socket Mode connected');
 
-      _ws!.stream.listen(
+      await _wsSub?.cancel();
+      _wsSub = _ws!.stream.listen(
         _onMessage,
         onError: (e) {
           _log.warning('Slack WS error: $e');
@@ -140,6 +144,10 @@ class SlackChannelAdapter implements ChannelAdapter {
   void _scheduleReconnect() {
     if (!_running) return;
     _reconnectTimer?.cancel();
+    _wsSub?.cancel();
+    _wsSub = null;
+    _ws?.sink.close();
+    _ws = null;
     _reconnectTimer =
         Timer(const Duration(seconds: 10), () => _connect());
   }
@@ -168,9 +176,7 @@ class SlackChannelAdapter implements ChannelAdapter {
 
     if (type == 'disconnect') {
       _log.info('Slack requested reconnect');
-      _ws?.sink.close();
-      _ws = null;
-      if (_running) _connect();
+      _scheduleReconnect();
       return;
     }
 
