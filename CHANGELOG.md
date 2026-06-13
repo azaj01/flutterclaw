@@ -1,12 +1,11 @@
-# FlutterClaw v1.0.18
+# FlutterClaw v1.0.19
 
 ## Highlights
 
-- **Operational hardening:** Message queue serializes concurrent ingress per session; secure gateway improvements; Android split-brain fix.
-- **UI & setup:** Health checks, setup wizard components, and settings screen redesign.
-- **ClawHub:** Skill search crash fix and install progress feedback.
-- **Code quality:** Analyzer warnings and lint cleanup across the codebase.
+- **OpenRouter onboarding:** Live model search with featured routers, pricing/context badges, and custom model ID fallback during setup.
+- **Chat UI:** Shared `TypingIndicator` replaces inline streaming shimmer while waiting for the first token.
+- **Session switcher:** Cleaner agent label (name only, no emoji prefix).
 
 ## Notes for builders
 
-- Version: **1.0.18** (build **19**) — see `pubspec.yaml`.
+- Version: **1.0.19** (build **20**) — see `pubspec.yaml`.
