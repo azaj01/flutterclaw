@@ -306,7 +306,7 @@ class _CreateAgentScreenState extends ConsumerState<CreateAgentScreen> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _selectedModel,
+              initialValue: _selectedModel,
               decoration: InputDecoration(
                 labelText: '${context.l10n.model} *',
                 border: const OutlineInputBorder(),

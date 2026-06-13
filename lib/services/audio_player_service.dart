@@ -2,6 +2,7 @@
 ///
 /// Provides lock-screen media controls and system media notifications.
 /// Call [initAudioService] from main.dart before runApp().
+// ignore_for_file: experimental_member_use
 library;
 
 import 'dart:async';

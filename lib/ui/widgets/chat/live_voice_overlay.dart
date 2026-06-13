@@ -2,6 +2,7 @@
 /// existing chat list. Transcript text streams into [chatProvider] via live agent
 /// events; tool pills still arrive from [SessionManager.messageStream]. Session
 /// persistence runs on [LiveTurnComplete] (and before tool rows when applicable).
+// ignore_for_file: experimental_member_use
 library;
 
 import 'dart:async';
@@ -873,17 +874,14 @@ class _LiveVoiceOverlayState extends ConsumerState<LiveVoiceOverlay>
 /// A [StreamAudioSource] that serves a complete in-memory WAV file.
 /// Returns the full byte payload on every [request] — no file I/O, no
 /// progressive streaming, just instant bytes.
-// ignore: experimental_member_use
 class _InMemoryWavSource extends StreamAudioSource {
   final Uint8List _wav;
   _InMemoryWavSource(this._wav);
 
   @override
-  // ignore: experimental_member_use
   Future<StreamAudioResponse> request([int? start, int? end]) async {
     final effectiveStart = start ?? 0;
     final effectiveEnd = end ?? _wav.length;
-    // ignore: experimental_member_use
     return StreamAudioResponse(
       sourceLength: _wav.length,
       contentLength: effectiveEnd - effectiveStart,

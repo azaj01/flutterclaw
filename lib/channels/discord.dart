@@ -58,7 +58,6 @@ class DiscordChannelAdapter implements ChannelAdapter {
   int? _lastSequence;
   String? _sessionId;
 
-  static const _maxRetries = 5;
 
   @override
   String get type => _type;

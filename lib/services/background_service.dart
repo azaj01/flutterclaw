@@ -4,7 +4,6 @@
 /// Starts/stops the gateway+agent+channels in a foreground service isolate.
 library;
 
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -155,7 +154,6 @@ class FlutterClawTaskHandler extends TaskHandler {
     }
   }
 
-  String? _cachedWorkspacePath;
 
   @override
   void onRepeatEvent(DateTime timestamp) {

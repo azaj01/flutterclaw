@@ -177,7 +177,7 @@ class ToolCall {
   });
 
   Map<String, dynamic> toJson() => {
-    if (extras != null) ...extras!,
+    ...?extras,
     'id': id,
     'type': type,
     'function': function.toJson(),

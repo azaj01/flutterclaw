@@ -296,7 +296,7 @@ class GatewayServer {
     }
 
     try {
-      final payload = await handleMethod(method, params, client: client);
+      final payload = await _handleMethod(method, params, client: client);
       _sendResponse(client, id, true, payload);
     } catch (e) {
       _log.warning('Method $method failed: $e');
@@ -321,8 +321,7 @@ class GatewayServer {
     client.channel.sink.add(res.toJsonString());
   }
 
-  /// Handle a protocol method. Returns payload or throws.
-  Future<dynamic> handleMethod(
+  Future<dynamic> _handleMethod(
     String method,
     Map<String, dynamic> params, {
     _Client? client,
